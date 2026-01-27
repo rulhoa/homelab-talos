@@ -389,7 +389,7 @@ cluster:
     #     certLifetime: 1h0m0s # Admin kubeconfig certificate lifetime (default is 1 year).
 
     # # Allows running workload on control-plane nodes.
-    # allowSchedulingOnControlPlanes: true
+    allowSchedulingOnControlPlanes: true
 ---
 apiVersion: v1alpha1
 kind: HostnameConfig
