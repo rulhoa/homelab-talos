@@ -239,3 +239,18 @@ Apply just a patch to a node:
 ```shell
 talosctl patch mc --nodes 10.2.0.11 --patch patch.yaml
 ```
+
+### Creating a bearer token
+
+```shell
+kubectl create serviceaccount <service-account-name>
+
+kubectl create clusterrolebinding <service-account-name>-view \
+  --clusterrole=view \
+  --serviceaccount=default:<service-account-name>
+
+kubectl create token <service-account-name>
+```
+
+
+
