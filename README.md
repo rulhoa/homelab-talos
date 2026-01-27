@@ -1,9 +1,12 @@
 # Homelab: Talos Kubernetes Cluster
 
-> [!IMPORTANT]
-> This cluster setup does not prioritise security and is not (and should not be) exposed to the Internet.
-> Its goal is for homelabbing for studying purposes.
+Homelab deployment of a Kubernetes cluster using Talos OS.
 
+## Disclaimers
+
+> [!IMPORTANT]
+> This cluster setup does not prioritise network security and is not (and should not be) exposed to the Internet.
+> Its goal is for homelabbing for studying purposes.
 
 ## Cluster Topology
 
