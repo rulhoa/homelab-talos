@@ -223,34 +223,61 @@ To check which extensions are enabled on each node, use:
 talosctl get extensions
 ```
 
+### Applying a Talos Patch
 
-### Adding a patch
-
-Updating full machineconfig with a patch, and then apply to a node:
-
-```shell
-talosctl machineconfig patch controlplane.yaml -p controlplane-patch1-enable-vip.yaml -o controlplane-v2.yaml
-
-talosctl apply-config --nodes 10.2.0.11 --file controlplane-v2.yaml
-```
-
-Apply just a patch to a node:
+After creating the yaml with the new definitions, apply it to a node.
 
 ```shell
 talosctl patch mc --nodes 10.2.0.11 --patch patch.yaml
 ```
 
-### Creating a bearer token
+Apply it to all relevant nodes in the cluster.
+
+Alternatively, the full machineconfig can be updated with the patch, and then used to applied to nodes:
+
+```shell
+# Merge patch "controlplane-patch1-enable-vip.yaml" into the machineconfig "controlplane.yaml" and export the new machineconfig as "controlplane-v2.yaml"
+talosctl machineconfig patch controlplane.yaml -p controlplane-patch1-enable-vip.yaml -o controlplane-v2.yaml
+
+# Apply the new and full machine config to a node
+talosctl apply-config --nodes 10.2.0.11 --file controlplane-v2.yaml
+```
+
+### Creating a Service Account and a bearer token
 
 ```shell
 kubectl create serviceaccount <service-account-name>
 
-kubectl create clusterrolebinding <service-account-name>-view \
-  --clusterrole=view \
-  --serviceaccount=default:<service-account-name>
-
 kubectl create token <service-account-name>
 ```
 
+### Managing Role Bindings: Read-Only
 
+The "view" role allows the read-only **get**, **list**, and **watch** actions on all namespaces.
 
+To apply it to an account:
+
+```shell
+kubectl create clusterrolebinding <service-account-name>-view \
+  --clusterrole=view \
+  --serviceaccount=default:<service-account-name>
+```
+
+Talos doesn't have a native readonly role for Nodes/Clusters.
+It can be created using [system-node-readonly.json](k8s/ClusterRoles/system-node-readonly.json), and used to create a Cluster Role:
+
+```shell
+# Create ClusterRole for node/cluster get, list, and watch
+kubectl apply -f k8s/ClusterRoles/system-node-readonly.json
+
+# Associate new ClusterRole to an account
+kubectl create clusterrolebinding <service-account-name>-node-readonly \
+  --clusterrole=system:node-readonly \
+  --serviceaccount=default:<service-account-name>
+```
+
+Role bindings can be deleted with:
+
+```shell
+kubectl delete clusterrolebinding <service-account-name>-node-readonly
+```
