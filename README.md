@@ -199,6 +199,7 @@ talosctl apply-config --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --file controlplane-
 As per the talos documentation, it will by default try to install to /dev/sda. Depending on the virtual disk setup it may be mounted differently (e.g: /dev/vda)
 
 To check the current disks on a node use the command below:
+
 ```shell
 talosctl get disks --insecure --nodes <ip>
 ```
@@ -240,7 +241,32 @@ talosctl apply-config --nodes 10.2.0.11 --file controlplane-v2.yaml
 ```shell
 kubectl create serviceaccount <service-account-name>
 
+# This creates a temporary token (duration follows server defaults)
 kubectl create token <service-account-name>
+
+# This creates a temporary token for 24 hours.
+kubectl create token <service-account-name> --duration=24h
+```
+
+Since kubernetes v1.24, creating a long lived tokens are no longer allowed.
+For a more persistant token, we need to use secrets with the type of "kubernetes.io/service-account-token":
+
+```shell
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: <service-account-name>-secret
+  annotations:
+    kubernetes.io/service-account.name: <service-account-name>
+EOF
+
+# To get the generated token (and ca.crt) - note that they are both in base64
+kubectl get secret/<service-account-name>-secret -o yaml
+
+# Retrieves the token in pure text
+kubectl describe secret/<service-account-name>-secret
 ```
 
 ### Managing Cluster Role Bindings
@@ -257,7 +283,7 @@ kubectl create clusterrolebinding <service-account-name>-view \
   --serviceaccount=default:<service-account-name>
 ```
 
-Talos doesn't have a native readonly role for Nodes/Clusters.
+Talos doesn't have a native readonly role (**get** and **list** verbs) for Nodes.
 It can be created using [system-node-readonly.json](k8s/ClusterRoles/system-node-readonly.json), and used to create a Cluster Role:
 
 ```shell

@@ -9,9 +9,9 @@
   },
   "rules": [
     {
-      "apiGroups": [""],
+      "apiGroups": ["", "*"],
       "resources": ["nodes"],
-      "verbs": ["get", "list", "watch"]
+      "verbs": ["get", "list"]
     }
   ]
 }
