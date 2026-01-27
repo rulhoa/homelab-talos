@@ -5,8 +5,8 @@ Homelab deployment of a Kubernetes cluster using Talos OS.
 ## Disclaimers
 
 > [!IMPORTANT]
-> This cluster setup does not prioritise network security and is not (and should not be) exposed to the Internet.
-> Its goal is for homelabbing for studying purposes.
+> This cluster should NOT be exposed to the Internet.
+> Its goal is for homelabbing for studying purposes, and internet facing service require additional security measures and tools beyond the scope of this project.
 
 ## Cluster Topology
 
