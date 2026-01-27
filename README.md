@@ -188,12 +188,11 @@ talosctl apply-config --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --file controlplane-
 
 
 
-
-
-<details>
-<summary>Useful management commands</summary>
-
 ## Additional commands
+<details>
+<summary>Useful management commands section</summary>
+
+
 
 ### /dev/sda not being found
 
