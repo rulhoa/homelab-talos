@@ -245,7 +245,7 @@ kubectl create token <service-account-name>
 
 ### Managing Cluster Role Bindings
 
-#### Applying Read-Only Roles
+#### Managing Cluster Role Bindings: Applying Read-Only Roles
 
 The "view" role allows the read-only **get**, **list**, and **watch** actions on all namespaces.
 
@@ -270,7 +270,7 @@ kubectl create clusterrolebinding <service-account-name>-node-readonly \
   --serviceaccount=default:<service-account-name>
 ```
 
-#### Inspecting Cluster Roles and Role Bindings
+#### Managing Cluster Role Bindings: Inspecting Roles and Bindings
 
 Cluster Roles:
 
@@ -295,7 +295,7 @@ kubectl get clusterrolebinding
 kubectl describe clusterrolebinding system:basic-user
 ```
 
-#### Deleting
+#### Managing Cluster Role Bindings: Deleting
 
 Role bindings can be deleted with:
 
