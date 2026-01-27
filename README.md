@@ -53,10 +53,9 @@ All nodes have the same configuration
 - **Service VIP**: kube-vip (managed by control plane nodes)
 
 Future plan:
+
 - **CNI**: Cilium with eBPF and native routing. kube-proxy disabled.
   - **Hubble**: Cilium observability
-
-
 
 ### Ingress & Services
 
@@ -74,7 +73,6 @@ Future plan:
 
 ## Deployment Steps
 
-
 1. Install talosctl
 
 ```shell
@@ -87,19 +85,13 @@ k8s.internal.salesulhoa.com  IN  A  192.168.0.10
 k8s.internal.salesulhoa.com  IN  A  192.168.0.11
 k8s.internal.salesulhoa.com  IN  A  192.168.0.12
 
-
-
 2. generate config files
-
 
 ```shell
 talosctl gen secrets -o secrets.yaml
 
 talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.1 --dns-domain k8s.internal.salesulhoa.com --with-secrets secrets.yaml
 ```
-
-
-
 
 
 ```shell
@@ -198,10 +190,8 @@ talosctl apply-config --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --file controlplane-
 
 
 
-
-
-
-
+<details>
+<summary>Useful management commands</summary>
 
 ## Additional commands
 
@@ -254,7 +244,9 @@ kubectl create serviceaccount <service-account-name>
 kubectl create token <service-account-name>
 ```
 
-### Managing Role Bindings: Read-Only
+### Managing Cluster Role Bindings
+
+#### Applying Read-Only Roles
 
 The "view" role allows the read-only **get**, **list**, and **watch** actions on all namespaces.
 
@@ -279,8 +271,37 @@ kubectl create clusterrolebinding <service-account-name>-node-readonly \
   --serviceaccount=default:<service-account-name>
 ```
 
+#### Inspecting Cluster Roles and Role Bindings
+
+Cluster Roles:
+
+```shell
+# Get full list of existing Cluster Roles with creation dates
+kubectl get ClusterRole
+
+# Get the json definition of the role "view"
+kubectl get ClusterRole view -o json
+
+# Get table of resources and permissions (verbs) defined in the "view" (can be more convenient than reading the json)
+kubectl describe clusterrole view
+```
+
+Cluster Role Bindings:
+
+```shell
+# Get full list of existing Cluster Role Bindings
+kubectl get clusterrolebinding
+
+# Describe the mapping between account and roles defined in the binding "system:basic-user"
+kubectl describe clusterrolebinding system:basic-user
+```
+
+#### Deleting
+
 Role bindings can be deleted with:
 
 ```shell
 kubectl delete clusterrolebinding <service-account-name>-node-readonly
 ```
+
+</details>
