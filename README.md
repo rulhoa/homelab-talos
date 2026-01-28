@@ -75,27 +75,27 @@ Future plan:
 
 1. Install local talosctl, kubectl, and helm commands
 
-  ```shell
-  # talosctl
-  curl -sL https://talos.dev/install | sh
+```shell
+# talosctl
+curl -sL https://talos.dev/install | sh
 
-  # kubectl
-  kubernetes_version="v1.34"
-  sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
-  curl -fsSL https://pkgs.k8s.io/core:/stable:/${kubernetes_version}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-  sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg # allow unprivileged APT programs to read this keyring
-  echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${kubernetes_version}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
-  sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list   # helps tools such as command-not-found to work correctly
-  sudo apt-get update
-  sudo apt-get install -y kubectl
+# kubectl
+kubernetes_version="v1.34"
+sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+curl -fsSL https://pkgs.k8s.io/core:/stable:/${kubernetes_version}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg # allow unprivileged APT programs to read this keyring
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${kubernetes_version}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list   # helps tools such as command-not-found to work correctly
+sudo apt-get update
+sudo apt-get install -y kubectl
 
-  # helm for Debian/Ubuntu
-  sudo apt-get install curl gpg apt-transport-https --yes
-  curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-  echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-  sudo apt-get update
-  sudo apt-get install helm
-  ```
+# helm for Debian/Ubuntu
+sudo apt-get install curl gpg apt-transport-https --yes
+curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+sudo apt-get update
+sudo apt-get install helm
+```
 
 2. Create DNS records (optional)
 
@@ -103,101 +103,150 @@ Future plan:
 
   I'm using (Technitium)[https://technitium.com] in my homelab, and the records below were added to my Forwarder subdomain zone.
 
-  ```text
-  k8s.internal.salesulhoa.com  IN  A  192.168.0.10
-  k8s.internal.salesulhoa.com  IN  A  192.168.0.11
-  k8s.internal.salesulhoa.com  IN  A  192.168.0.12
-  ```
+  Below is what I configured in my lab:
 
-3. Generate Talos config files
+```text
+k8s.internal.salesulhoa.com  IN  A  192.168.0.10
+k8s.internal.salesulhoa.com  IN  A  192.168.0.11
+k8s.internal.salesulhoa.com  IN  A  192.168.0.12
+```
 
-  ```shell
-  talosctl gen secrets -o secrets.yaml
-
-  talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.1 --dns-domain k8s.internal.salesulhoa.com --with-secrets secrets.yaml
-  ```
-
-  ```shell
-  talosctl config merge ./talosconfig
-
-  talosctl config endpoint 10.2.0.11 10.2.0.12 10.2.0.13
-  talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
-
-  ```
-
-4. Download Talos ISO
+3. Download Talos ISO
 
 ```shell
 curl https://github.com/siderolabs/talos/releases/download/v1.12.1/metal-amd64.iso -L -o talos-v1.12.1.iso
 ```
 
-or
+  I used the proxmox UI to download the ISO directly to the ISO storage, but the ISO can also be downloaded and uploaded manually.
 
-use proxmox UI to download the ISO directly and save to ISO storage.
+  The exact version of this ISO doesn't matter, as we'll use it only for the initial bootstrap of each Talos VM. In the next steps we'll handle the actual ISO version we'll want to run in our lab.
+  
+4. Generate custom Talos ISO
 
-obs: v1.12.1 was released on 2026-01-05 and was the latest stable release on 2026-01-14
+  Since Talos Linux is immutable, any non-default packages that our cluster requires needs to be included in the ISO, for which we'll use the [Talos Linux Image Factory](https://factory.talos.dev/) website that was created by the great folks at Sidero Labs.
+  
+  Settings used:
 
+- **Hardware type**: Cloud Server (recommended for Proxmox)
+- **Talos version**: 1.12.2
+- **Cloud**: Nocloud (recommended for Proxmox)
+- **Machine Architecture**: amd64 (Secureboot disabled)
+- **System Extensions**:
+  - siderolabs/qemu-guest-agent: used to improve proxmox management experience. Without it memory usage will always report as 100%
+  - siderolabs/iscsi-tools: required by LongHorn
+  - siderolabs/util-linux-tools: required by LongHorn
+- **Customization**: default options
 
-Your image schematic ID is: 88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b
-https://factory.talos.dev/image/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b/v1.12.1/nocloud-amd64.iso
+  After selecting the options above, the final page will contain links and ids. Copy the id string in "Initial Installation" section:
 
-obs: nocloud is the recommended for onprem virtualization.
-
-https://factory.talos.dev/?arch=amd64&bootloader=auto&cmdline-set=true&extensions=-&extensions=siderolabs%2Fiscsi-tools&extensions=siderolabs%2Fqemu-guest-agent&extensions=siderolabs%2Futil-linux-tools&platform=nocloud&target=cloud&version=1.12.1
-
-```yaml
-customization:
-    systemExtensions:
-        officialExtensions:
-            - siderolabs/iscsi-tools
-            - siderolabs/qemu-guest-agent
-            - siderolabs/util-linux-tools
+```text
+factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2
 ```
 
+5. Generate Talos machine config files
 
+  The commands below generate the initial machine configurations. Make sure to:
 
-3. Provision VMs
+- Change the "--install-image" value to the custom image ID generated previously;
+- Change the "--dns-domain" value to the desired FQDN, or just remove this optional setting.
 
-| Setting   | Used values       | Notes            |
-| --------- | ----------------- | ---------------- |
-|BIOS       | SeaBIOS	                                    | Security is a minor concern. Otherwise we would be using UEFI |
-|Machine	| q35	                                        | Modern PCIe-based machine type with better device support |
-|Qemu Agent | enabled                                       | |
-|CPU Type	| host	                                        | Enables advanced instruction sets (AVX-512, etc.), best performance. Obs: May prevent live-migration in the future |
-|CPU Cores	| 8 cores                                       | Minimum 2 cores required |
-|Memory	    | 8GB	                                        | Minimum 2GB required |
-|Disk Controller | VirtIO SCSI (NOT “VirtIO SCSI Single”)   | Single controller can cause bootstrap hangs (#11173) |
-|Disk Format | Raw (performance) or QCOW2 (features/snapshots) | Raw preferred for performance |
-|Disk Cache  | No Cache (Default)                           | My proxmox server doesn't have an UPS, so no caching reducing potential performance but minimizes risk of dataloss |
-|Disk features | Discard enabled                            | |
-|Network Model | virtio                                     | Paravirtualized driver, best performance (up to 10 Gbit) |
-|Memory  | Ballooning Disabled | Talos doesn’t support memory hotplug |
+```shell
+talosctl gen secrets -o secrets.yaml
 
-Reference: <https://docs.siderolabs.com/talos/v1.12/platform-specific-installations/virtualized-platforms/proxmox>
+talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2 --dns-domain k8s.internal.salesulhoa.com --with-secrets secrets.yaml
+```
 
-Boot using talos ISO.
+  In the future, the used image can be updated manually in each of the machine configurations by editing:
 
-NTP server: a.st1.ntp.br
+```json
+machine:
+  install:
+    image: <desired image id>
+```
 
-4. Take note of VM's IP
+  example:
 
-5. Applying
+```json
+machine:
+  install:
+    image: factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2
+```
+
+6. Prepare talosctl environment
+
+  When the machine config are created, talosctl also creates the talosconfig file that can me merged into the default `~/talos/config`
+
+```shell
+talosctl config merge ./talosconfig
+```
+
+  Make sure to add the cluster endpoints and nodes that will be configured.
+
+```shell
+talosctl config endpoint 10.2.0.11 10.2.0.12 10.2.0.13
+talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
+```
+
+7. Provision VMs
+
+  Create 3 VMs using the settings below:
+
+  | Setting   | Used values       | Notes            |
+  | --------- | ----------------- | ---------------- |
+  |BIOS       | SeaBIOS	                                    | Security is a minor concern. Otherwise we would be using UEFI |
+  |Machine	| q35	                                        | Modern PCIe-based machine type with better device support |
+  |Qemu Agent | enabled                                       | |
+  |CPU Type	| host	                                        | Enables advanced instruction sets (AVX-512, etc.), best performance. Obs: May prevent live-migration in the future |
+  |CPU Cores	| 8 cores                                       | Minimum 2 cores required |
+  |Memory	    | 8GB	                                        | Minimum 2GB required |
+  |Disk Controller | VirtIO SCSI (NOT “VirtIO SCSI Single”)   | Single controller can cause bootstrap hangs (#11173) |
+  |Disk Format | Raw (performance) or QCOW2 (features/snapshots) | Raw preferred for performance |
+  |Disk Cache  | No Cache (Default)                           | My proxmox server doesn't have an UPS, so no caching reducing potential performance but minimizes risk of dataloss |
+  |Disk features | Discard enabled                            | |
+  |Network Model | virtio                                     | Paravirtualized driver, best performance (up to 10 Gbit) |
+  |Memory  | Ballooning Disabled | Talos doesn’t support memory hotplug |
+
+  Reference: <https://docs.siderolabs.com/talos/v1.12/platform-specific-installations/virtualized-platforms/proxmox>
+
+  Boot using talos ISO that was downloaded previously (not the custom ISO).
+
+  Make sure to use to console to configure the desired static IP, gateway, and network DNS server for each node.
+
+  In an enterprise environment, the desired IP would be assigned automatically using DHCP.
+
+8. Applying Machine configurations
+
+  Apply control plane configuration to each node:
 
 ```shell
 talosctl apply-config --insecure --nodes 10.2.0.11 --file controlplane.yaml
 talosctl apply-config --insecure --nodes 10.2.0.12 --file controlplane.yaml
 talosctl apply-config --insecure --nodes 10.2.0.13 --file controlplane.yaml
+```
+
+  Obs: the "--insecure" flag only works on nodes booting from the ISO and not yet installed to disk, which is our case.
+
+  Wait for them to finish installing/rebooting before continuing.
 
 
+9. Initializing the cluster's etcd
+
+  On ONLY one node run:
+
+```shell
 talosctl bootstrap --nodes 10.2.0.11
+```
 
-# Wait a few minutes and check console for when node is healthy
+  Wait a few minutes and monitor the console for when node is flagged as healthy in green
 
+10. Configure kubectl configuration
+
+```shell
 # update kubeconfig file for use with kubectl
 talosctl kubeconfig --nodes 10.2.0.11
 
+# Command below should return that all nodes are "Ready"
 kubectl get nodes
-
 ```
 
 6. Patch Virtual IP
