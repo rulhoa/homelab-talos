@@ -73,36 +73,59 @@ Future plan:
 
 ## Deployment Steps
 
-1. Install talosctl
+1. Install local talosctl, kubectl, and helm commands
 
-```shell
-curl -sL https://talos.dev/install | sh
-```
+  ```shell
+  # talosctl
+  curl -sL https://talos.dev/install | sh
 
-1. generate dns record
+  # kubectl
+  kubernetes_version="v1.34"
+  sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+  curl -fsSL https://pkgs.k8s.io/core:/stable:/${kubernetes_version}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg # allow unprivileged APT programs to read this keyring
+  echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${kubernetes_version}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+  sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list   # helps tools such as command-not-found to work correctly
+  sudo apt-get update
+  sudo apt-get install -y kubectl
 
-k8s.internal.salesulhoa.com  IN  A  192.168.0.10
-k8s.internal.salesulhoa.com  IN  A  192.168.0.11
-k8s.internal.salesulhoa.com  IN  A  192.168.0.12
+  # helm for Debian/Ubuntu
+  sudo apt-get install curl gpg apt-transport-https --yes
+  curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+  echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+  sudo apt-get update
+  sudo apt-get install helm
+  ```
 
-2. generate config files
+2. Create DNS records (optional)
 
-```shell
-talosctl gen secrets -o secrets.yaml
+  This is mostly for convenience so I can use a single FQDN with the cluster, and let my local DNS server round-robin the control lane IPs.
 
-talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.1 --dns-domain k8s.internal.salesulhoa.com --with-secrets secrets.yaml
-```
+  I'm using (Technitium)[https://technitium.com] in my homelab, and the records below were added to my Forwarder subdomain zone.
 
+  ```text
+  k8s.internal.salesulhoa.com  IN  A  192.168.0.10
+  k8s.internal.salesulhoa.com  IN  A  192.168.0.11
+  k8s.internal.salesulhoa.com  IN  A  192.168.0.12
+  ```
 
-```shell
-talosctl config merge ./talosconfig
+3. Generate Talos config files
 
-talosctl config endpoint 10.2.0.11 10.2.0.12 10.2.0.13
-talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
+  ```shell
+  talosctl gen secrets -o secrets.yaml
 
-```
+  talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.1 --dns-domain k8s.internal.salesulhoa.com --with-secrets secrets.yaml
+  ```
 
-2. Download Talos ISO
+  ```shell
+  talosctl config merge ./talosconfig
+
+  talosctl config endpoint 10.2.0.11 10.2.0.12 10.2.0.13
+  talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
+
+  ```
+
+4. Download Talos ISO
 
 ```shell
 curl https://github.com/siderolabs/talos/releases/download/v1.12.1/metal-amd64.iso -L -o talos-v1.12.1.iso
