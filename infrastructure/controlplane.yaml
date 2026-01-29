@@ -398,8 +398,3 @@ auto: stable # A method to automatically generate a hostname for the machine.
 # # A static hostname to set for the machine.
 # hostname: controlplane1
 # hostname: controlplane1.example.org
----
-apiVersion: v1alpha1
-kind: Layer2VIPConfig
-name: 10.2.0.10
-link: enp0s2
