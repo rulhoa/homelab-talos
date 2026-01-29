@@ -19,7 +19,9 @@ Segregated network for cluster is 10.2.0.0/24
 - 10.2.0.11-49: IPs for nodes
 - 10.2.0.50-250: IPs for pod LoadBalancer services
 
-obs: choices were made to make it easier to remember IP roles at-a-glance.
+> [!TIP]
+> Choices were made to make it easier to remember IP roles at-a-glance, and simplify administration.
+> An enterprise deployment would segregate IP roles into different private and public networks.
 
 ## Node configurations
 
@@ -75,6 +77,10 @@ Future plan:
 
 1. Install local talosctl, kubectl, and helm commands
 
+- **talosctl** is for configuring talos nodes - our infrastructure.
+- **kubectl** for managing kubernetes - our services.
+- **helm** for deploying services as packages.
+
 ```shell
 # talosctl
 curl -sL https://talos.dev/install | sh
@@ -114,16 +120,16 @@ k8s.internal.salesulhoa.com  IN  A  192.168.0.12
 3. Download Talos ISO
 
 ```shell
-curl https://github.com/siderolabs/talos/releases/download/v1.12.1/metal-amd64.iso -L -o talos-v1.12.1.iso
+curl https://github.com/siderolabs/talos/releases/download/v1.12.2/metal-amd64.iso -L -o talos-v1.12.2.iso
 ```
 
   I used the proxmox UI to download the ISO directly to the ISO storage, but the ISO can also be downloaded and uploaded manually.
 
-  The exact version of this ISO doesn't matter, as we'll use it only for the initial bootstrap of each Talos VM. In the next steps we'll handle the actual ISO version we'll want to run in our lab.
+  Which 1.12.x version of this ISO doesn't matter, as we'll use it only for the initial bootstrap of each Talos VM. In the next steps we'll handle the custom ISO version we'll want to run in our lab.
   
 4. Generate custom Talos ISO
 
-  Since Talos Linux is immutable, any non-default packages that our cluster requires needs to be included in the ISO, for which we'll use the [Talos Linux Image Factory](https://factory.talos.dev/) website that was created by the great folks at Sidero Labs.
+  Since Talos Linux is immutable, any non-default packages that the OS requires needs to be included in the ISO, for which we'll use the [Talos Linux Image Factory](https://factory.talos.dev/) website to create.
   
   Settings used:
 
@@ -156,7 +162,7 @@ talosctl gen secrets -o secrets.yaml
 talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2 --dns-domain k8s.internal.salesulhoa.com --with-secrets secrets.yaml
 ```
 
-  In the future, the used image can be updated manually in each of the machine configurations by editing:
+  In the future, the desired image can be updated manually in each of the machine configuration jsons by editing the section:
 
 ```json
 machine:
@@ -172,9 +178,20 @@ machine:
     image: factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2
 ```
 
-6. Prepare talosctl environment
+> [!WARNING]
+> Nodes that have had an image already installed require the use of the command `talosctl upgrade` to update.
+> Just applying an updated machine config is not sufficient.
 
-  When the machine config are created, talosctl also creates the talosconfig file that can me merged into the default `~/talos/config`
+6. Talos machine config changes
+
+  Manually edit the `controlplane.yaml` with the following:
+
+- Set the `Cluster` parameter `allowSchedulingOnControlPlanes` to `true`
+  - This allows Control Plane nodes to act as worker nodes.
+
+7. Prepare talosctl environment
+
+  When machine configs are created by talosctl, it also creates a talosconfig file for the cluster that can be merged into the default `~/talos/config`
 
 ```shell
 talosctl config merge ./talosconfig
@@ -187,7 +204,7 @@ talosctl config endpoint 10.2.0.11 10.2.0.12 10.2.0.13
 talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
 ```
 
-7. Provision VMs
+8. Provision VMs
 
   Create 3 VMs using the settings below:
 
@@ -214,7 +231,7 @@ talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
 
   In an enterprise environment, the desired IP would be assigned automatically using DHCP.
 
-8. Applying Machine configurations
+9. Applying Machine configurations
 
   Apply control plane configuration to each node:
 
@@ -226,10 +243,13 @@ talosctl apply-config --insecure --nodes 10.2.0.13 --file controlplane.yaml
 
   Obs: the "--insecure" flag only works on nodes booting from the ISO and not yet installed to disk, which is our case.
 
-  Wait for them to finish installing/rebooting before continuing.
+  Monitor each node's console to wait for them to finish installing/rebooting before continuing.
 
+> [!TIP]
+> New nodes can be added to the cluster in the future by running the `apply-config` command above.
+> Once the node becomes healthly - after the installation, it'll automatically be used for workloads.
 
-9. Initializing the cluster's etcd
+10. Initializing the cluster's etcd
 
   On ONLY one node run:
 
@@ -239,7 +259,7 @@ talosctl bootstrap --nodes 10.2.0.11
 
   Wait a few minutes and monitor the console for when node is flagged as healthy in green
 
-10. Configure kubectl configuration
+11. Configure kubectl
 
 ```shell
 # update kubeconfig file for use with kubectl
@@ -249,22 +269,9 @@ talosctl kubeconfig --nodes 10.2.0.11
 kubectl get nodes
 ```
 
-6. Patch Virtual IP
-
-```shell
-talosctl machineconfig patch controlplane.yaml -p controlplane-patch1-enable-vip.yaml -o controlplane-v2.yaml
-
-talosctl apply-config --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --file controlplane-v2.yaml
-```
-
-
-
-
 ## Additional commands
 <details>
 <summary>Useful management commands section</summary>
-
-
 
 ### /dev/sda not being found
 
@@ -305,7 +312,7 @@ Alternatively, the full machineconfig can be updated with the patch, and then us
 talosctl machineconfig patch controlplane.yaml -p controlplane-patch1-enable-vip.yaml -o controlplane-v2.yaml
 
 # Apply the new and full machine config to a node
-talosctl apply-config --nodes 10.2.0.11 --file controlplane-v2.yaml
+talosctl apply-config --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --file controlplane-v2.yaml
 ```
 
 ### Creating a Service Account and a bearer token
@@ -400,5 +407,22 @@ Role bindings can be deleted with:
 ```shell
 kubectl delete clusterrolebinding <service-account-name>-node-readonly
 ```
+
+### Updating talos image on nodes
+
+
+```shell
+talosctl upgrade --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2
+```
+
+Wait for all nodes to finish with the status "post check passed".
+
+To avoid unavailability of services, apply the upgrade incrementally.
+
+> [!TIP]
+> Since the upgrade process might change between minor releases, always check the documentation to see if intermediary upgrade steps are required.
+
+Note that Kubernetes is not upgraded automatically, with image updates on an existing cluster, to avoid issues.
+
 
 </details>
