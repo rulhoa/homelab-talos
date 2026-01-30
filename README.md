@@ -75,7 +75,7 @@ Future plan:
 
 ## Deployment Steps
 
-1. Install local talosctl, kubectl, and helm commands
+### 1. Install local talosctl, kubectl, and helm commands
 
 - **talosctl** is for configuring talos nodes - our infrastructure.
 - **kubectl** for managing kubernetes - our services.
@@ -103,7 +103,7 @@ sudo apt-get update
 sudo apt-get install helm
 ```
 
-2. Create DNS records (optional)
+### 2. Create DNS records (optional)
 
   This is mostly for convenience so I can use a single FQDN with the cluster, and let my local DNS server round-robin the control lane IPs.
 
@@ -117,7 +117,7 @@ k8s.internal.salesulhoa.com  IN  A  192.168.0.11
 k8s.internal.salesulhoa.com  IN  A  192.168.0.12
 ```
 
-3. Download Talos ISO
+### 3. Download Talos ISO
 
 ```shell
 curl https://github.com/siderolabs/talos/releases/download/v1.12.2/metal-amd64.iso -L -o talos-v1.12.2.iso
@@ -127,7 +127,7 @@ curl https://github.com/siderolabs/talos/releases/download/v1.12.2/metal-amd64.i
 
   Which 1.12.x version of this ISO doesn't matter, as we'll use it only for the initial bootstrap of each Talos VM. In the next steps we'll handle the custom ISO version we'll want to run in our lab.
   
-4. Generate custom Talos ISO
+### 4. Generate custom Talos ISO
 
   Since Talos Linux is immutable, any non-default packages that the OS requires needs to be included in the ISO, for which we'll use the [Talos Linux Image Factory](https://factory.talos.dev/) website to create.
   
@@ -149,7 +149,7 @@ curl https://github.com/siderolabs/talos/releases/download/v1.12.2/metal-amd64.i
 factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2
 ```
 
-5. Generate Talos machine config files
+### 5. Generate Talos machine config files
 
   The commands below generate the initial machine configurations. Make sure to:
 
@@ -182,14 +182,14 @@ machine:
 > Nodes that have had an image already installed require the use of the command `talosctl upgrade` to update.
 > Just applying an updated machine config is not sufficient.
 
-6. Talos machine config changes
+### 6. Talos machine config changes
 
   Manually edit the `controlplane.yaml` with the following:
 
 - Set the `Cluster` parameter `allowSchedulingOnControlPlanes` to `true`
   - This allows Control Plane nodes to act as worker nodes.
 
-7. Prepare talosctl environment
+### 7. Prepare talosctl environment
 
   When machine configs are created by talosctl, it also creates a talosconfig file for the cluster that can be merged into the default `~/talos/config`
 
@@ -204,7 +204,7 @@ talosctl config endpoint 10.2.0.11 10.2.0.12 10.2.0.13
 talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
 ```
 
-8. Provision VMs
+### 8. Provision VMs
 
   Create 3 VMs using the settings below:
 
@@ -231,7 +231,7 @@ talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
 
   In an enterprise environment, the desired IP would be assigned automatically using DHCP.
 
-9. Applying Machine configurations
+### 9. Applying Machine configurations
 
   Apply control plane configuration to each node:
 
@@ -249,7 +249,7 @@ talosctl apply-config --insecure --nodes 10.2.0.13 --file controlplane.yaml
 > New nodes can be added to the cluster in the future by running the `apply-config` command above.
 > Once the node becomes healthly - after the installation, it'll automatically be used for workloads.
 
-10. Initializing the cluster's etcd
+### 10. Initializing the cluster's etcd
 
   On ONLY one node run:
 
@@ -259,7 +259,7 @@ talosctl bootstrap --nodes 10.2.0.11
 
   Wait a few minutes and monitor the console for when node is flagged as healthy in green
 
-11. Configure kubectl
+### 11. Configure kubectl
 
 ```shell
 # update kubeconfig file for use with kubectl
