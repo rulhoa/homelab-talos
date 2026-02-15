@@ -52,17 +52,20 @@ All nodes have the same configuration
 
 ### Networking Layer
 
-- **Service VIP**: kube-vip (managed by control plane nodes)
-
-Future plan:
-
 - **CNI**: Cilium with eBPF and native routing. kube-proxy disabled.
   - **Hubble**: Cilium observability
 
+Future plan:
+
+- **Service VIP**: kube-vip (managed by control plane nodes)
+
 ### Ingress & Services
 
-- **Ingress Controller**: Traefik
 - **Load Balancer**: MetalLB (Layer 2 advertisement)
+
+Future plan:
+
+- **Ingress Controller**: Traefik
 
 ### Storage Layer
 
@@ -234,7 +237,6 @@ talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
 >
 > Handle with care...
 
-
 ### 8. Provision VMs
 
   Create 3 VMs using the settings below:
@@ -332,8 +334,8 @@ kubectl get pods -A -w
 
 ### 13. Configuring MetalLB
 
-
 Since we're using control plane nodes as workers, we need to remove the label that excludes control plane from load balancers. Create a patch file `controlplane-patch3-loadbalancer.yaml` with the following:
+
 ```yaml
 machine:
   nodeLabels:
@@ -347,20 +349,25 @@ and apply it to the cluster:
 talosctl apply-config --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --patch controlplane-patch3-loadbalancer.yaml
 ```
 
+And now to deploy MetalLB:
+
 ```shell
+# Create the namespace with required permission labels
 kubectl apply -f k8s/metallb/namespace_metallb-system.yaml
 
+# Prep helm with metallb repository
 helm repo add metallb https://metallb.github.io/metallb && helm repo update
 
+# Deploy metallb
 helm install metallb metallb/metallb \
     --version 0.15.3 \
     --namespace metallb-system
 
+# Configure IP Address pool and L2Advertisement.
+#   Address pool defines available IP ranges
+#   Advertisement is necessary for network connectivity.
 kubectl apply -f IPAddressPool.yaml
-
 ```
-
-
 
 ### 14. Configuring Longhorn
 
@@ -401,7 +408,6 @@ kubectl patch storageclass longhorn \
 kubectl port-forward service/longhorn-frontend 8080:80 -n longhorn-system
 #  access the UI from <http://localhost:8080>
 ```
-
 
 ## Additional commands
 <details>
