@@ -134,7 +134,7 @@ curl https://github.com/siderolabs/talos/releases/download/v1.12.2/metal-amd64.i
   Settings used:
 
 - **Hardware type**: Cloud Server (recommended for Proxmox)
-- **Talos version**: 1.12.2
+- **Talos version**: 1.12.4
 - **Cloud**: Nocloud (recommended for Proxmox)
 - **Machine Architecture**: amd64 (Secureboot disabled)
 - **System Extensions**:
@@ -146,7 +146,7 @@ curl https://github.com/siderolabs/talos/releases/download/v1.12.2/metal-amd64.i
   After selecting the options above, the final page will contain links and ids. Copy the id string in "Initial Installation" section:
 
 ```text
-factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2
+factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.4
 ```
 
 ### 5. Generate Talos machine config files
@@ -159,7 +159,7 @@ factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34
 ```shell
 talosctl gen secrets -o secrets.yaml
 
-talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2 --dns-domain k8s.internal.salesulhoa.com --with-secrets secrets.yaml
+talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.4 --dns-domain k8s.internal.salesulhoa.com --with-secrets secrets.yaml
 ```
 
   In the future, the desired image can be updated manually in each of the machine configuration jsons by editing the section:
@@ -175,7 +175,7 @@ machine:
 ```json
 machine:
   install:
-    image: factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2
+    image: factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.4
 ```
 
 > [!WARNING]
@@ -188,6 +188,21 @@ machine:
 
 - Set the `Cluster` parameter `allowSchedulingOnControlPlanes` to `true`
   - This allows Control Plane nodes to act as worker nodes.
+
+
+  Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following kernel modules required for longhorn:
+
+```yaml
+machine:
+  kernel:
+    modules:
+      - name: nbd
+      - name: iscsi_tcp
+      - name: iscsi_generic
+      - name: configfs
+```
+
+
 
 ### 7. Prepare talosctl environment
 
@@ -216,12 +231,12 @@ talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
   |CPU Type	| host	                                        | Enables advanced instruction sets (AVX-512, etc.), best performance. Obs: May prevent live-migration in the future |
   |CPU Cores	| 8 cores                                       | Minimum 2 cores required |
   |Memory	    | 8GB	                                        | Minimum 2GB required |
-  |Disk Controller | VirtIO SCSI (NOT “VirtIO SCSI Single”)   | Single controller can cause bootstrap hangs (#11173) |
+  |Disk Controller | VirtIO SCSI (NOT "VirtIO SCSI Single")   | Single controller can cause bootstrap hangs (#11173) |
   |Disk Format | Raw (performance) or QCOW2 (features/snapshots) | Raw preferred for performance |
   |Disk Cache  | No Cache (Default)                           | My proxmox server doesn't have an UPS, so no caching reducing potential performance but minimizes risk of dataloss |
   |Disk features | Discard enabled                            | |
   |Network Model | virtio                                     | Paravirtualized driver, best performance (up to 10 Gbit) |
-  |Memory  | Ballooning Disabled | Talos doesn’t support memory hotplug |
+  |Memory  | Ballooning Disabled | Talos doesn't support memory hotplug |
 
   Reference: <https://docs.siderolabs.com/talos/v1.12/platform-specific-installations/virtualized-platforms/proxmox>
 
@@ -268,6 +283,48 @@ talosctl kubeconfig --nodes 10.2.0.11
 # Command below should return that all nodes are "Ready"
 kubectl get nodes
 ```
+
+### 12. Configuring Longhorn
+
+```shell
+# Create and mount volume /var/mnt/longhorn using an available disk (our VM should have 2 disks, with 1 available)
+talosctl patch mc --patch @controlplane-patch2-longhorn-volume.yaml
+
+# Check if a "u-longhorn" (u for user volume) was mounted in each node
+talosctl get volumestatus | grep longhorn
+
+# Check if "u-longhorn" was mounted as "/var/mnt/longhorn" on each node
+talosctl get mounts | grep longhorn
+
+#talosctl wipe disk sdb1 --drop-partition
+```
+
+```shell
+# Create the longhorn namespace with pod security labels that it requires to function properly
+
+kubectl apply -f k8s/longhorn/namespace_longhorn-system.yaml
+
+helm repo add longhorn https://charts.longhorn.io && helm repo update
+
+helm install longhorn longhorn/longhorn --version 1.11.0 --namespace longhorn-system --values=k8s/longhorn/helm_values.yaml 
+
+
+kubectl -n longhorn-system get pod -w
+
+kubectl get storageclass
+
+#kubectl patch storageclass longhorn \
+#  -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+
+
+kubectl port-forward service/longhorn-frontend 8080:80 -n longhorn-system
+#  access the UI from <http://localhost:8080>
+```
+
+
+
+
 
 ## Additional commands
 <details>
@@ -412,7 +469,7 @@ kubectl delete clusterrolebinding <service-account-name>-node-readonly
 
 
 ```shell
-talosctl upgrade --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.2
+talosctl upgrade --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.4
 ```
 
 Wait for all nodes to finish with the status "post check passed".
