@@ -36,7 +36,7 @@ VM naming convention in Proxmox:
 Node DNS names:
 - node\[ip\].k8s.internal.\[my-domain\].com
 
-Node hsotname:
+Node hostname:
 - node\[ip\]
 
 
@@ -149,7 +149,7 @@ curl https://github.com/siderolabs/talos/releases/download/v1.12.2/metal-amd64.i
 factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.4
 ```
 
-### 5. Generate Talos machine config files
+### 5. Generate Talos machine config (mc) files
 
   The commands below generate the initial machine configurations. Make sure to:
 
@@ -190,6 +190,17 @@ machine:
   - This allows Control Plane nodes to act as worker nodes.
 
 
+  Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following configurations required for Cilium CNI. Note that kube-proxy is going to be disabled and we'll need to install Cilium shortly after bootstrapping etcd so that the cluster has connectivity.
+
+```yaml
+cluster:
+  network:
+    cni:
+      name: none
+  proxy:
+    disabled: true
+```
+
   Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following kernel modules required for longhorn:
 
 ```yaml
@@ -198,11 +209,8 @@ machine:
     modules:
       - name: nbd
       - name: iscsi_tcp
-      - name: iscsi_generic
       - name: configfs
 ```
-
-
 
 ### 7. Prepare talosctl environment
 
@@ -218,6 +226,14 @@ talosctl config merge ./talosconfig
 talosctl config endpoint 10.2.0.11 10.2.0.12 10.2.0.13
 talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
 ```
+
+> [!IMPORTANT]
+> Do note that "config node" sets all the listed nodes as default values when running any command with talosctl
+> At the same time that this makes it easier to send commands to every node,
+> it also means that commands like `talosctl shutdown` are sent to every node, WITHOUT asking for confirmation
+>
+> Handle with care...
+
 
 ### 8. Provision VMs
 
@@ -264,7 +280,7 @@ talosctl apply-config --insecure --nodes 10.2.0.13 --file controlplane.yaml
 > New nodes can be added to the cluster in the future by running the `apply-config` command above.
 > Once the node becomes healthly - after the installation, it'll automatically be used for workloads.
 
-### 10. Initializing the cluster's etcd
+### 10. Initializing the cluster's etcd (bootstrapping)
 
   On ONLY one node run:
 
@@ -284,7 +300,69 @@ talosctl kubeconfig --nodes 10.2.0.11
 kubectl get nodes
 ```
 
-### 12. Configuring Longhorn
+
+### 12. Configuring Cilium CNI
+
+```shell
+
+helm repo add cilium https://helm.cilium.io/
+helm repo update
+
+helm install \
+    cilium \
+    cilium/cilium \
+    --version 1.18.7 \
+    --namespace kube-system \
+    --set ipam.mode=kubernetes \
+    --set kubeProxyReplacement=true \
+    --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
+    --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}" \
+    --set cgroup.autoMount.enabled=false \
+    --set cgroup.hostRoot=/sys/fs/cgroup \
+    --set k8sServiceHost=localhost \
+    --set k8sServicePort=7445
+    --set=gatewayAPI.enabled=true \
+    --set=gatewayAPI.enableAlpn=true \
+    --set=gatewayAPI.enableAppProtocol=true
+
+# Wait for all pods to enter a Running stage. Multiple pod errors and restarts are expected during the process.
+kubectl get pods -A -w
+
+```
+
+### 13. Configuring MetalLB
+
+
+Since we're using control plane nodes as workers, we need to remove the label that excludes control plane from load balancers. Create a patch file `controlplane-patch3-loadbalancer.yaml` with the following:
+```yaml
+machine:
+  nodeLabels:
+    node.kubernetes.io/exclude-from-external-load-balancers:
+      $patch: delete
+```
+
+and apply it to the cluster:
+
+```shell
+talosctl apply-config --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --patch controlplane-patch3-loadbalancer.yaml
+```
+
+```shell
+kubectl apply -f k8s/metallb/namespace_metallb-system.yaml
+
+helm repo add metallb https://metallb.github.io/metallb && helm repo update
+
+helm install metallb metallb/metallb \
+    --version 0.15.3 \
+    --namespace metallb-system
+
+kubectl apply -f IPAddressPool.yaml
+
+```
+
+
+
+### 14. Configuring Longhorn
 
 ```shell
 # Create and mount volume /var/mnt/longhorn using an available disk (our VM should have 2 disks, with 1 available)
@@ -308,12 +386,14 @@ helm repo add longhorn https://charts.longhorn.io && helm repo update
 
 helm install longhorn longhorn/longhorn --version 1.11.0 --namespace longhorn-system --values=k8s/longhorn/helm_values.yaml 
 
-
+# Wait for all pods to reach a running state
 kubectl -n longhorn-system get pod -w
 
+# longhorn should be the default storage class
 kubectl get storageclass
 
-#kubectl patch storageclass longhorn \
+# In case longhorn isn't the default, the patch command below can be used to make it sot.
+kubectl patch storageclass longhorn \
 #  -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 
 
@@ -321,9 +401,6 @@ kubectl get storageclass
 kubectl port-forward service/longhorn-frontend 8080:80 -n longhorn-system
 #  access the UI from <http://localhost:8080>
 ```
-
-
-
 
 
 ## Additional commands

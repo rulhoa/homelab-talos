@@ -193,7 +193,7 @@ machine:
             # Modules required by longhorn
             - name: nbd
             - name: iscsi_tcp
-            - name: iscsi_generic
+            #- name: iscsi_generic
             - name: configfs
 
     # # Configures the seccomp profiles for the machine.
@@ -243,8 +243,8 @@ cluster:
             - 10.96.0.0/12
         
         # # The CNI used.
-        # cni:
-        #     name: custom # Name of CNI to use.
+        cni:
+            name: none #custom # Name of CNI to use.
         #     # URLs containing manifests to apply for the CNI.
         #     urls:
         #         - https://docs.projectcalico.org/archive/v3.20/manifests/canal.yaml
@@ -323,7 +323,7 @@ cluster:
         image: registry.k8s.io/kube-proxy:v1.35.0 # The container image used in the kube-proxy manifest.
         
         # # Disable kube-proxy deployment on cluster bootstrap.
-        # disabled: false
+        disabled: true #false
     # Scheduler server specific configuration options.
     scheduler:
         image: registry.k8s.io/kube-scheduler:v1.35.0 # The container image used in the scheduler manifest.
