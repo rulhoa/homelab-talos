@@ -407,10 +407,14 @@ auto: stable # A method to automatically generate a hostname for the machine.
 apiVersion: v1alpha1
 kind: UserVolumeConfig
 name: longhorn
+# This creates a volume mounted at /var/mnt/longhorn
 provisioning:
-  diskSelector:
+  diskSelector: # Any disk that matches the following filter
     match: "!system_disk"
+  # Has this minimum size
   minSize: 10GiB
+  # And this maximum (100% = no limit)
   maxSize: 100%
 filesystem:
+  # xfs has kernel level journal recover, unlike ext4 which relies on userspace tools to recover from unclean shutdowns.
   type: xfs
