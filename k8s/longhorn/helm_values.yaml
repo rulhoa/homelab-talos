@@ -26,10 +26,12 @@ defaultSettings:
   storageReservedPercentageForDefaultDisk: 10
   # -- Default path to use for storing data on a host. An absolute directory path indicates a filesystem-type disk used by the V1 Data Engine, while a path to a block device indicates a block-type disk used by the V2 Data Engine. The default value is "/var/lib/longhorn/".
   defaultDataPath: /var/mnt/longhorn
+  # -- Policy that defines the action Longhorn takes when a volume is stuck with a StatefulSet or Deployment pod on a node that failed.
+  # delete-both-statefulset-and-deployment-pod = Longhorn will force delete StatefulSet/Deployment terminating pods on nodes that are down to release Longhorn volumes so that Kubernetes can spin up replacement pods.
+  nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod
 
 persistence:
   # -- Replica count of the default Longhorn StorageClass.
   defaultClassReplicaCount: 3
   # -- Reclaim policy that provides instructions for handling of a volume after its claim is released. (Options: "Retain", "Delete")
   reclaimPolicy: Delete
-
