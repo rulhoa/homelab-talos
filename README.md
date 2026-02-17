@@ -193,7 +193,7 @@ machine:
   - This allows Control Plane nodes to act as worker nodes.
 
 
-  Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following configurations required for Cilium CNI. Note that kube-proxy is going to be disabled and we'll need to install Cilium shortly after bootstrapping etcd so that the cluster has connectivity.
+  Cilium CNI: Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following configurations required for Cilium CNI. Note that kube-proxy is going to be disabled and we'll need to install Cilium shortly after bootstrapping etcd so that the cluster has connectivity.
 
 ```yaml
 cluster:
@@ -204,7 +204,7 @@ cluster:
     disabled: true
 ```
 
-  Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following kernel modules required for longhorn:
+  Longhorn: Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following kernel modules required for longhorn:
 
 ```yaml
 machine:
@@ -214,6 +214,32 @@ machine:
       - name: iscsi_tcp
       - name: configfs
 ```
+
+  Metrics Server: Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following configurations:
+
+```yaml
+machine:
+  kubelet:
+    extraArgs:
+      rotate-server-certificates: true
+cluster:
+  extraManifests:
+    - https://raw.githubusercontent.com/alex1989hu/kubelet-serving-cert-approver/main/deploy/standalone-install.yaml
+    - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+  etcd:
+    extraArgs:
+      listen-metrics-urls: http://0.0.0.0:2381
+```
+  
+  Also Manually edit both the `controlplane.yaml` to add the following configurations:
+
+```yaml
+cluster:
+  etcd:
+    extraArgs:
+      listen-metrics-urls: http://0.0.0.0:2381
+```
+
 
 ### 7. Prepare talosctl environment
 
@@ -404,10 +430,37 @@ kubectl patch storageclass longhorn \
 #  -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 
 
-
 kubectl port-forward service/longhorn-frontend 8080:80 -n longhorn-system
 #  access the UI from <http://localhost:8080>
 ```
+
+### 15. Configuring Metric Server
+
+It should have been automatically deployed during the bootstrap based on the defined machine configurations. Use the following to test:
+
+```shell
+kubectl top nodes
+# It should output something like the below:
+#NAME     CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%   
+#node11   530m         6%     3618Mi          49%       
+#node12   432m         5%     2700Mi          36%       
+#node13   1311m        16%    1429Mi          19%  
+#
+# If a node reports unknown or an the metric api is unavailable, the deployment failed
+
+# Use the below to get prometheus style export of all metrics
+curl 10.2.0.11:2381/metrics
+```
+
+
+In case the case the metric server wasn't auto deployed during the bootstrap, use the following:
+
+```shell
+kubectl apply -f https://raw.githubusercontent.com/alex1989hu/kubelet-serving-cert-approver/main/deploy/standalone-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+
 
 ## Additional commands
 <details>

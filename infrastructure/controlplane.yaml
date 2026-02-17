@@ -31,6 +31,8 @@ machine:
         # # The `extraArgs` field is used to provide additional flags to the kubelet.
         # extraArgs:
         #     key: value
+        extraArgs:
+            rotate-server-certificates: "true"
 
         # # The `extraMounts` field is used to add additional mounts to the kubelet container.
         # extraMounts:
@@ -109,8 +111,8 @@ machine:
         #     allowedKubernetesNamespaces:
         #         - kube-system
     # Configures the node labels for the machine.
-    nodeLabels:
-        node.kubernetes.io/exclude-from-external-load-balancers: ""
+    #nodeLabels:
+    #    node.kubernetes.io/exclude-from-external-load-balancers: ""
     
     # # Provides machine specific control plane configuration options.
 
@@ -352,10 +354,16 @@ cluster:
         # # The `advertisedSubnets` field configures the networks to pick etcd advertised IP from.
         # advertisedSubnets:
         #     - 10.0.0.0/8
+        extraArgs:
+            listen-metrics-urls: http://0.0.0.0:2381
+            
     # A list of urls that point to additional manifests.
-    extraManifests: []
+    #extraManifests: []
     #   - https://www.example.com/manifest1.yaml
     #   - https://www.example.com/manifest2.yaml
+    extraManifests:
+        - https://raw.githubusercontent.com/alex1989hu/kubelet-serving-cert-approver/main/deploy/standalone-install.yaml
+        - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 
     # A list of inline Kubernetes manifests.
     inlineManifests: []
@@ -403,6 +411,11 @@ auto: stable # A method to automatically generate a hostname for the machine.
 # # A static hostname to set for the machine.
 # hostname: controlplane1
 # hostname: controlplane1.example.org
+---
+apiVersion: v1alpha1
+kind: Layer2VIPConfig
+name: 10.2.0.10
+link: enp0s2
 ---
 apiVersion: v1alpha1
 kind: UserVolumeConfig

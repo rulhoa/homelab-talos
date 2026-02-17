@@ -30,6 +30,8 @@ machine:
         # # The `extraArgs` field is used to provide additional flags to the kubelet.
         # extraArgs:
         #     key: value
+        extraArgs:
+            rotate-server-certificates: true
 
         # # The `extraMounts` field is used to add additional mounts to the kubelet container.
         # extraMounts:
@@ -408,6 +410,9 @@ cluster:
     # extraManifests:
     #     - https://www.example.com/manifest1.yaml
     #     - https://www.example.com/manifest2.yaml
+    extraManifests:
+        - https://raw.githubusercontent.com/alex1989hu/kubelet-serving-cert-approver/main/deploy/standalone-install.yaml
+        - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 
     # # A map of key value pairs that will be added while fetching the extraManifests.
     # extraManifestHeaders:
