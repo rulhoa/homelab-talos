@@ -1,6 +1,8 @@
 # Homelab: Talos Kubernetes Cluster
 
-Homelab deployment of a Kubernetes cluster using Talos OS.
+Homelab deployment of a Kubernetes cluster using [Talos OS](https://docs.siderolabs.com/talos/v1.13/overview/what-is-talos) on Proxmox.
+
+Infrastructure (VM) provisioning is done mostly via Terraform and Talos configurations using talosctl, and other k8s tools.
 
 ## Disclaimers
 
@@ -39,7 +41,6 @@ Node DNS names:
 Node hostname:
 - node\[ip\]
 
-
 All nodes have the same configuration
 
 - vCPU 4
@@ -50,10 +51,11 @@ All nodes have the same configuration
 
 ## Component Stack
 
-### Networking Layer
+### Networking Layer (CNI)
 
-- **CNI**: Cilium with eBPF and native routing. kube-proxy disabled.
-  - **Hubble**: Cilium observability
+**CNI**: Cilium with eBPF and native routing. kube-proxy disabled
+
+- **Hubble**: Cilium observability
 
 Future plan:
 
@@ -67,9 +69,15 @@ Future plan:
 
 - **Ingress Controller**: Traefik
 
-### Storage Layer
+### Storage Layer (CSI)
 
-- **Engine**: Longhorn distributed block storage
+**Engine**: Longhorn distributed block storage:
+
+- Picked for simplicity. Important to note that Longhorn can't reliably handle high workloads.
+- Production environments we would use Ceph or OpenEBS
+
+Setup:
+
 - **Disk**: Dedicated storage disk on each node
 - **Replication**: 3 replicas across nodes
 - **Storage Overcommit**: 500%
@@ -80,11 +88,19 @@ Future plan:
 
 ### 1. Install local talosctl, kubectl, and helm commands
 
+- **terraform* is for provisioning proxmox resources
 - **talosctl** is for configuring talos nodes - our infrastructure.
 - **kubectl** for managing kubernetes - our services.
 - **helm** for deploying services as packages.
 
 ```shell
+
+# terraform
+# See https://developer.hashicorp.com/terraform/install for the latest instructions
+wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform
+
 # talosctl
 curl -sL https://talos.dev/install | sh
 
@@ -110,7 +126,7 @@ sudo apt-get install helm
 
   This is mostly for convenience so I can use a single FQDN with the cluster, and let my local DNS server round-robin the control lane IPs.
 
-  I'm using (Technitium)[https://technitium.com] in my homelab, and the records below were added to my Forwarder subdomain zone.
+  I'm using [Technitium](https://technitium.com) in my homelab, and the records below were added to my Forwarder subdomain zone.
 
   Below is what I configured in my lab:
 
@@ -123,12 +139,13 @@ k8s.internal.salesulhoa.com  IN  A  192.168.0.12
 ### 3. Download Talos ISO
 
 ```shell
-curl https://github.com/siderolabs/talos/releases/download/v1.12.2/metal-amd64.iso -L -o talos-v1.12.2.iso
+TALOS_VERSION="v1.13.4"
+curl https://github.com/siderolabs/talos/releases/download/${TALOS_VERSION}/metal-amd64.iso -L -o talos-${TALOS_VERSION}.iso
 ```
 
   I used the proxmox UI to download the ISO directly to the ISO storage, but the ISO can also be downloaded and uploaded manually.
 
-  Which 1.12.x version of this ISO doesn't matter, as we'll use it only for the initial bootstrap of each Talos VM. In the next steps we'll handle the custom ISO version we'll want to run in our lab.
+  Which 1.13.x version of this ISO doesn't matter, as we'll use it only for the initial bootstrap of each Talos VM. In the next steps we'll handle the custom ISO version we'll want to run in our lab.
   
 ### 4. Generate custom Talos ISO
 
@@ -137,19 +154,20 @@ curl https://github.com/siderolabs/talos/releases/download/v1.12.2/metal-amd64.i
   Settings used:
 
 - **Hardware type**: Cloud Server (recommended for Proxmox)
-- **Talos version**: 1.12.4
+- **Talos version**: 1.13.5
 - **Cloud**: Nocloud (recommended for Proxmox)
 - **Machine Architecture**: amd64 (Secureboot disabled)
 - **System Extensions**:
   - siderolabs/qemu-guest-agent: used to improve proxmox management experience. Without it memory usage will always report as 100%
   - siderolabs/iscsi-tools: required by LongHorn
-  - siderolabs/util-linux-tools: required by LongHorn
+  - siderolabs/util-linux-tools: required by LongHorn and also for fstrim to discard unused blocks (great to keep our thin-provisioned disks optimized in terms of actual disk usage)
+  - siderolabs/nfsd: NFS server (optional for future usage)
 - **Customization**: default options
 
   After selecting the options above, the final page will contain links and ids. Copy the id string in "Initial Installation" section:
 
 ```text
-factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.4
+factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.13.4
 ```
 
 ### 5. Generate Talos machine config (mc) files
