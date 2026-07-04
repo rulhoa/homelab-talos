@@ -2,7 +2,8 @@
 
 Homelab deployment of a Kubernetes cluster using [Talos OS](https://docs.siderolabs.com/talos/v1.13/overview/what-is-talos) on Proxmox.
 
-Infrastructure (VM) provisioning is done mostly via Terraform and Talos configurations using talosctl, and other k8s tools.
+Infrastructure (VM) provisioning is done on Proxmox via Terraform.
+Talos configurations are setup with talosctl, and other k8s tools.
 
 ## Disclaimers
 
