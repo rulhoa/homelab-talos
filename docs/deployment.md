@@ -228,7 +228,29 @@ talosctl config node 10.1.0.11 10.1.0.12 10.1.0.13 10.1.0.21 10.1.0.22 10.1.0.23
 
 ## Provisioning VMs
 
-Terraform
+We'll use Terraform
+
+```shell
+cd infrastructure/terraform/proxmos-talos-cluster
+
+# Download and cache providers
+terraform init
+
+# Validate necessary changes
+terraform plan
+
+# Apply changes
+terraform apply
+
+# Delete all previously created resources
+#terraform destroy
+
+# Import into state file an existing resource that wasn't created by terraform
+# Resource must have been defined in a *.tf file
+#terraform import <resource_type.resource_name> <name_in_destination>
+```
+
+Wait for talos to finish booting in each VM, in a few minutes
 
 ## Applying Machine configurations
 
