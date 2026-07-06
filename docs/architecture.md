@@ -49,6 +49,7 @@ As a bonus, Cilium comes with **Hubble** that provides observability of Cilium i
 #### Ingress & Services
 
 Future plan:
+
 - **Load Balancer**: [Cilium LB IPAM](https://docs.cilium.io/en/stable/network/lb-ipam/)
 - **Ingress Controller**: Traefik
 - **Gateway API**
@@ -63,7 +64,7 @@ Future plan:
 Setup:
 
 - **Disk**: Dedicated storage disk on each worker node
-- **Replication**: 2 replicas across nodes
+- **Replication**: 3 replicas across nodes
 - **Storage Overcommit**: 500%
   - Not expecting all services to fully use allocated space.
   - This is a study lab and right sizing is not a priority.
@@ -76,41 +77,15 @@ Setup:
 
 ## Cluster Topology
 
-All nodes configured as control planes and workers to save resources.
+Segregated network for cluster is 10.1.0.0/24
 
-Segregated network for cluster is 10.2.0.0/24
+- 10.1.0.1: network gateway
+- 10.1.0.10: Cluster's VIP (virtual IP)
+- 10.1.0.11-19: Control Plane node IPs
+- 10.1.0.21-100: Worker node IPs
 
-- 10.2.0.1: network gateway
-- 10.2.0.10: Cluster's VIP (virtual IP)
-- 10.2.0.11-49: IPs for nodes
-- 10.2.0.50-250: IPs for pod LoadBalancer services
+A second network for LoadBalancer services are available in 10.1.1.0/24 with gateway 10.1.1.1
 
 > [!TIP]
 > Choices were made to make it easier to remember IP roles at-a-glance, and simplify administration.
-> An enterprise deployment would segregate IP roles into different private and public networks.
-
-## Node configurations
-
-Nodes are VMs running in Proxmox.
-
-VM naming convention in Proxmox:
-
-- k8s.node\[IP\]
-  - IP: last octet number (e.g. 10 for 10.2.0.10).
-  - e.g.: k8s.node10
-
-Node DNS names:
-
-- node\[ip\].k8s.internal.\[my-domain\].com
-
-Node hostname:
-
-- node\[ip\]
-
-All nodes have the same configuration
-
-- vCPU 4
-- RAM 8192 MB
-- Disk
-  - OS: 32 GB
-  - Storage: 32GB
+> An enterprise deployment may segregate IP roles into different private and public networks.
