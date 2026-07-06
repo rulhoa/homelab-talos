@@ -8,7 +8,7 @@
   - **Container Runtime Interface (CRI):** containerd (Talos default)
   - **Container Network Interface (CNI):** [Cilium](https://docs.cilium.io/en/stable/overview/intro/)
   - **Container Storage Interface (CSI):** Longhorn
-- **Load Balancer:** MetalLB (planned to be replaced with [Cilium LB IPAM](https://docs.cilium.io/en/stable/network/lb-ipam/))
+- **Load Balancer:**  [Cilium LB IPAM](https://docs.cilium.io/en/stable/network/lb-ipam/) (planned)
 - **Ingress:** Traefik (planned)
 - **Metrics:** Metrics Server
 
@@ -24,49 +24,46 @@ Terraform was picked for convenience, but the used syntax and provider are also 
 
 ### Kubernetes (k8s)
 
-Talos OS is an immutable Linux distribution optimized for provisioning kubernetes.
+Talos OS (by Sidero) is an immutable Linux distribution optimized for provisioning kubernetes.
 
-This means that it is lightweight, SSH and shell are not available, the OS filesystem can't be changed, and no package managers are included.
+Immutable means that the OS filesystem can't be changed after installation, and it also doesn't contain any package manager, terminal, or SSH access. All management must be done via authenticated API, which the "talosctl" command utilizes and follows the GotOps "everything-as-code" mindset. Node version upgrades are actually reinstallations using a newer ISO, which must include all desired Linux extensions (drivers, libraries, etc) and customizations.
 
-This makes provisioning it much more secure and predictable in relation to other distributions of Linux and K8S. Node version upgrades are actually reinstallations using a newer ISO, which must include all desired Linux extensions (drivers, libraries, etc) and customizations.
-
-All management must be done via authenticated API, which the "talosctl" command utilizes and follows the "every-as-code" mindset.
+Optimized means that it is lightweight, more secure, and predictable in relation to other distributions of Linux and K8S.
 
 #### Container Runtime Interface (CRI)
 
 Used the Talos default of **containerd** as it's sufficient for all but specialized workloads.
 
+### Networking
+
 #### Container Network Interface (CNI)
 
-This is for the internal network between k8s nodes
+This is for the internal network between k8s nodes.
 
-**CNI**: Cilium for eBPF native routing. kube-proxy disabled
+The default **kube-proxy** (although no technically a CNI) is great for small labs, but doesn't scale in enterprise settings, and it can be easily disabled in favor of using, as I picked, **Cilium** due to native eBPF routing.
 
-- **Hubble**: Cilium observability
+Other alternatives are Flannel, Calico, kube-router, and Multus (among others) as described in the [Sidero kubernetes guide documentation](https://docs.siderolabs.com/kubernetes-guides/overview/kubernetes-guides-overview).
 
-The default **kube-proxy** is great for small labs, but doesn't scale in enterprise settings
-Calico, Flannel, Cilium, and Canal.
+As a bonus, Cilium comes with **Hubble** that provides observability of Cilium itself.
 
-
-### Ingress & Services
-
-- **Load Balancer**: MetalLB (Layer 2 advertisement)
+#### Ingress & Services
 
 Future plan:
-
+- **Load Balancer**: [Cilium LB IPAM](https://docs.cilium.io/en/stable/network/lb-ipam/)
 - **Ingress Controller**: Traefik
+- **Gateway API**
 
 ### Storage Layer (CSI)
 
 **Engine**: Longhorn distributed block storage:
 
 - Picked for simplicity. Important to note that Longhorn can't reliably handle high workloads.
-- Production environments we would use Ceph or OpenEBS
+- Production environments would use Ceph or OpenEBS
 
 Setup:
 
-- **Disk**: Dedicated storage disk on each node
-- **Replication**: 3 replicas across nodes
+- **Disk**: Dedicated storage disk on each worker node
+- **Replication**: 2 replicas across nodes
 - **Storage Overcommit**: 500%
   - Not expecting all services to fully use allocated space.
   - This is a study lab and right sizing is not a priority.

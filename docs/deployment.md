@@ -1,71 +1,78 @@
 # Deployment Steps
 
-## 1. Install local talosctl, kubectl, and helm commands
+## Installing local commands
 
-- **terraform** is for provisioning proxmox resources
-- **talosctl** is for configuring talos nodes - our infrastructure.
-- **kubectl** for managing kubernetes - our services.
-- **helm** for deploying services as packages.
+We'll use these to provision and configure the cluster
+
+- **terraform** is for provisioning proxmox resources (network, initial Talos ISO, VMs)
+- **talosctl** is for configuring talos nodes
+- **kubectl** for managing kubernetes.
+- **helm** for deploying manifests as packages.
+
+Obs.: I used Ubuntu24.04 running through Windows WSL.
+
+Terraform:
 
 ```shell
-
-# terraform
-# See https://developer.hashicorp.com/terraform/install for the latest instructions
 wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
 sudo apt update && sudo apt install terraform
+```
 
-# talosctl
+talosctl:
+
+```shell
 curl -sL https://talos.dev/install | sh
+```
 
-# kubectl
-kubernetes_version="v1.34"
+kubectl:
+
+```shell
+# Dependencies
 sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
-curl -fsSL https://pkgs.k8s.io/core:/stable:/${kubernetes_version}/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+# Install latest
+## GPG key (new one for every major release)
+curl -fsSL "https://pkgs.k8s.io/core:/stable:/$(curl -L -s https://dl.k8s.io/release/stable.txt | cut -d"." -f1-2)/deb/Release.key" | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg # allow unprivileged APT programs to read this keyring
-echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${kubernetes_version}/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
-sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list   # helps tools such as command-not-found to work correctly
+## apt repo config
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$(curl -L -s https://dl.k8s.io/release/stable.txt | cut -d"." -f1-2)/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list   # helps unprivileged commands to work correctly
+### Update cache and install
 sudo apt-get update
 sudo apt-get install -y kubectl
+```
 
-# helm for Debian/Ubuntu
-sudo apt-get install curl gpg apt-transport-https --yes
+helm:
+
+```shell
+sudo apt-get install -y curl gpg apt-transport-https
 curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
 echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
 sudo apt-get update
 sudo apt-get install helm
 ```
 
-## 2. Create DNS records (optional)
+## Create DNS records (optional)
 
-  This is mostly for convenience so I can use a single FQDN with the cluster, and let my local DNS server round-robin the control lane IPs.
+This is mostly for convenience so I can use a single FQDN with the cluster, and let my local DNS server round-robin the control plane IPs.
 
-  I'm using [Technitium](https://technitium.com) in my homelab, and the records below were added to my Forwarder subdomain zone.
-
-  Below is what I configured in my lab:
+I'm using [Technitium](https://technitium.com) in my homelab, and the records below were added to my Forwarder subdomain zone:
 
 ```text
-k8s.internal.salesulhoa.com  IN  A  192.168.0.10
-k8s.internal.salesulhoa.com  IN  A  192.168.0.11
-k8s.internal.salesulhoa.com  IN  A  192.168.0.12
+k8s.internal.salesulhoa.com  IN  A  10.1.0.11
+k8s.internal.salesulhoa.com  IN  A  10.1.0.12
+k8s.internal.salesulhoa.com  IN  A  10.1.0.13
 ```
 
-## 3. Download Talos ISO
+## Talos ISO
 
-```shell
-TALOS_VERSION="v1.13.4"
-curl https://github.com/siderolabs/talos/releases/download/${TALOS_VERSION}/metal-amd64.iso -L -o talos-${TALOS_VERSION}.iso
-```
+We'll need two versions.
 
-  I used the proxmox UI to download the ISO directly to the ISO storage, but the ISO can also be downloaded and uploaded manually.
+The first is just for the initial boot of the VMs and has already been set in [proxmox.talos.iso.tf](infrastructure/terraform/proxmos-talos-cluster/proxmox.talos.iso.tf). The actual version of this ISO doesn't matter, as long as it's not unreasonably old. The VMs will boot from it and wait for us to apply the first machine configuration which will containing the second version...
 
-  Which 1.13.x version of this ISO doesn't matter, as we'll use it only for the initial bootstrap of each Talos VM. In the next steps we'll handle the custom ISO version we'll want to run in our lab.
+THe second version is what we actually want the cluster install and run. Since Talos Linux is immutable, any non-default packages that the OS requires needs to be included in the ISO, for which we'll use the [Talos Linux Image Factory](https://factory.talos.dev/) website to create.
   
-## 4. Generate custom Talos ISO
-
-  Since Talos Linux is immutable, any non-default packages that the OS requires needs to be included in the ISO, for which we'll use the [Talos Linux Image Factory](https://factory.talos.dev/) website to create.
-  
-  Settings used:
+Settings used:
 
 - **Hardware type**: Cloud Server (recommended for Proxmox)
 - **Talos version**: 1.13.5
@@ -75,39 +82,54 @@ curl https://github.com/siderolabs/talos/releases/download/${TALOS_VERSION}/meta
   - siderolabs/qemu-guest-agent: used to improve proxmox management experience. Without it memory usage will always report as 100%
   - siderolabs/iscsi-tools: required by LongHorn
   - siderolabs/util-linux-tools: required by LongHorn and also for fstrim to discard unused blocks (great to keep our thin-provisioned disks optimized in terms of actual disk usage)
-  - siderolabs/nfsd: NFS server (optional for future usage)
 - **Customization**: default options
 
-  After selecting the options above, the final page will contain links and ids. Copy the id string in "Initial Installation" section:
+After selecting the options above, the final page will contain links and ids. Copy the id string in "Initial Installation" section:
 
 ```text
-factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.13.4
+factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.13.5 
 ```
 
-## 5. Generate Talos machine config (mc) files
+## Talos machine config (mc) files
 
-  The commands below generate the initial machine configurations. Make sure to:
+The files in the folder [infrastructure/talos]([infrastructure/talos]) are included as a reference. It's recommended to generate new files with your own secrets.
 
-- Change the "--install-image" value to the custom image ID generated previously;
-- Change the "--dns-domain" value to the desired FQDN, or just remove this optional setting.
+### Generate Talos machine config (mc) files
+
+The commands below generate the initial machine configurations.
+
+> [!IMPORTANT]
+> The talosctl version (talosctl version --client) should match the Talos OS version installed on your nodes.
+> If you are using a newer version of talosctl to generate configurations for an older Talos OS, use the --talos-version flag to ensure compatibility. For example, to generate a configuration compatible with Talos v1.13 use --talos-version v1.13
 
 ```shell
+# Generate secrets
 talosctl gen secrets -o secrets.yaml
 
-talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.4 --dns-domain k8s.internal.salesulhoa.com --with-secrets secrets.yaml
+# Generate initial machine configs
+## Change "talos" to whatever is the desired cluster name
+## change "k8s.internal.salesulhoa.com" to whatever IP/FQDN is being used
+## Change the "--install-image" value to the custom image ID generated previously;
+## Change the "--dns-domain" value to the desired FQDN, or just remove this optional setting.
+talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --dns-domain k8s.internal.salesulhoa.com --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.13.5 --with-secrets secrets.yaml
 ```
 
-  In the future, the desired image can be updated manually in each of the machine configuration jsons by editing the section:
+The following "machine config" files should have been generated:
 
-```json
+- controlplane.yaml
+- worker.yaml
+
+For future reference, the desired image can be updated manually in each of the machine configuration jsons by editing the section:
+
+```yaml
 machine:
   install:
     image: <desired image id>
 ```
 
-  example:
+example:
 
-```json
+```yaml
 machine:
   install:
     image: factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.4
@@ -117,14 +139,16 @@ machine:
 > Nodes that have had an image already installed require the use of the command `talosctl upgrade` to update.
 > Just applying an updated machine config is not sufficient.
 
-## 6. Talos machine config changes
+### mc config changes
 
-  Manually edit the `controlplane.yaml` with the following:
+Manually edit the mc files with the following:
 
-- Set the `Cluster` parameter `allowSchedulingOnControlPlanes` to `true`
-  - This allows Control Plane nodes to act as worker nodes.
+> [!TIP]
+> To allow Control Plan nodes to act as worker nodes, set the `Cluster` parameter `allowSchedulingOnControlPlanes` to `true`
 
-  Cilium CNI: Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following configurations required for Cilium CNI. Note that kube-proxy is going to be disabled and we'll need to install Cilium shortly after bootstrapping etcd so that the cluster has connectivity.
+#### Cilium CNI
+
+Manually edit both the `controlplane.yaml` to add the following configurations required for Cilium CNI. It disables kube-proxy so we can fully use Cilium later in the guide.
 
 ```yaml
 cluster:
@@ -135,7 +159,9 @@ cluster:
     disabled: true
 ```
 
-  Longhorn: Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following kernel modules required for longhorn:
+#### Longhorn
+
+Since only the worker nodes will be running LongHorn, manually edit the `worker.yaml` to add the following required kernel modules:
 
 ```yaml
 machine:
@@ -146,7 +172,9 @@ machine:
       - name: configfs
 ```
 
-  Metrics Server: Manually edit both the `controlplane.yaml` and `worker.yaml` to add the following configurations:
+#### Metric Server
+
+Edit the `controlplane.yaml` to add the following configurations:
 
 ```yaml
 machine:
@@ -154,121 +182,112 @@ machine:
     extraArgs:
       rotate-server-certificates: true
 cluster:
+  etcd:
+    extraArgs:
+      listen-metrics-urls: http://0.0.0.0:2381
   extraManifests:
     - https://raw.githubusercontent.com/alex1989hu/kubelet-serving-cert-approver/main/deploy/standalone-install.yaml
     - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-  etcd:
-    extraArgs:
-      listen-metrics-urls: http://0.0.0.0:2381
 ```
-  
-  Also Manually edit both the `controlplane.yaml` to add the following configurations:
+
+Edit the `worker.yaml` to add the following configurations:
 
 ```yaml
-cluster:
-  etcd:
+machine:
+  kubelet:
     extraArgs:
-      listen-metrics-urls: http://0.0.0.0:2381
+      rotate-server-certificates: true
 ```
 
-## 7. Prepare talosctl environment
+## Prepare talosctl environment
 
-  When machine configs are created by talosctl, it also creates a talosconfig file for the cluster that can be merged into the default `~/talos/config`
+When machine configs are created by talosctl, it also creates a `talosconfig` file for the cluster that can be merged into the default `~/talos/config`
 
 ```shell
 talosctl config merge ./talosconfig
 ```
 
-  Make sure to add the cluster endpoints and nodes that will be configured.
+Now we configure the cluster endpoints and nodes in talosctl.
 
 ```shell
-talosctl config endpoint 10.2.0.11 10.2.0.12 10.2.0.13
-talosctl config node 10.2.0.11 10.2.0.12 10.2.0.13
+# Endpoints are nodes that talosctl communicates via API. Typically control plane nodes, as they can be used as a "proxy" to other nodes.
+# Trying to add worker nodes will likely lead to "permission denied" error messages when trying to use them to communicatae with a different node.
+talosctl config endpoint 10.1.0.11 10.1.0.12 10.1.0.13
+
+# Nodes are the list of nodes that we want to interact with through the endpoint(s).
+talosctl config node 10.1.0.11 10.1.0.12 10.1.0.13 10.1.0.21 10.1.0.22 10.1.0.23
 ```
 
 > [!IMPORTANT]
-> Do note that "config node" sets all the listed nodes as default values when running any command with talosctl
+> Do note that "talosctl config node" sets all the listed nodes as the default target when running any command with talosctl
+> This means that any talosctl command will, by default, send any request to ALL the configured nodes - unless an override flag is specified.
 > At the same time that this makes it easier to send commands to every node,
 > it also means that commands like `talosctl shutdown` are sent to every node, WITHOUT asking for confirmation
 >
 > Handle with care...
 
-## 8. Provision VMs
+## Provisioning VMs
 
-  Create 3 VMs using the settings below:
+Terraform
 
-  | Setting   | Used values       | Notes            |
-  | --------- | ----------------- | ---------------- |
-  |BIOS       | SeaBIOS                                     | Security is a minor concern. Otherwise we would be using UEFI |
-  |Machine | q35                                         | Modern PCIe-based machine type with better device support |
-  |Qemu Agent | enabled                                       | |
-  |CPU Type | host                                         | Enables advanced instruction sets (AVX-512, etc.), best performance. Obs: May prevent live-migration in the future |
-  |CPU Cores | 8 cores                                       | Minimum 2 cores required |
-  |Memory     | 8GB                                         | Minimum 2GB required |
-  |Disk Controller | VirtIO SCSI (NOT "VirtIO SCSI Single")   | Single controller can cause bootstrap hangs (#11173) |
-  |Disk Format | Raw (performance) or QCOW2 (features/snapshots) | Raw preferred for performance |
-  |Disk Cache  | No Cache (Default)                           | My proxmox server doesn't have an UPS, so no caching reducing potential performance but minimizes risk of dataloss |
-  |Disk features | Discard enabled                            | |
-  |Network Model | virtio                                     | Paravirtualized driver, best performance (up to 10 Gbit) |
-  |Memory  | Ballooning Disabled | Talos doesn't support memory hotplug |
-
-  Reference: <https://docs.siderolabs.com/talos/v1.12/platform-specific-installations/virtualized-platforms/proxmox>
-
-  Boot using talos ISO that was downloaded previously (not the custom ISO).
-
-  Make sure to use to console to configure the desired static IP, gateway, and network DNS server for each node.
-
-  In an enterprise environment, the desired IP would be assigned automatically using DHCP.
-
-## 9. Applying Machine configurations
+## Applying Machine configurations
 
   Apply control plane configuration to each node:
 
 ```shell
-talosctl apply-config --insecure --nodes 10.2.0.11 --file controlplane.yaml
-talosctl apply-config --insecure --nodes 10.2.0.12 --file controlplane.yaml
-talosctl apply-config --insecure --nodes 10.2.0.13 --file controlplane.yaml
+# Con
+talosctl apply-config --insecure --nodes 10.1.0.11 --file controlplane.yaml
+talosctl apply-config --insecure --nodes 10.1.0.12 --file controlplane.yaml
+talosctl apply-config --insecure --nodes 10.1.0.13 --file controlplane.yaml
+
+talosctl apply-config --insecure --nodes 10.1.0.21 --file worker.yaml
+talosctl apply-config --insecure --nodes 10.1.0.22 --file worker.yaml
+talosctl apply-config --insecure --nodes 10.1.0.23 --file worker.yaml
 ```
 
-  Obs: the "--insecure" flag only works on nodes booting from the ISO and not yet installed to disk, which is our case.
+The "--insecure" flag only works on nodes booting from the ISO and not yet installed to disk, which is our case.
+You'll get the following error if Talos has already been installed: `error applying new configuration: rpc error: code = Unavailable desc = connection error: desc = "error reading server preface: remote error: tls: certificate required"`.
 
-  Monitor each node's console to wait for them to finish installing/rebooting before continuing.
+Monitor each node's console to wait for them to finish installing/rebooting before continuing.
 
 > [!TIP]
 > New nodes can be added to the cluster in the future by running the `apply-config` command above.
-> Once the node becomes healthly - after the installation, it'll automatically be used for workloads.
+> Once the node becomes healthly - after the installation, it'll automatically have been added to the cluster.
 
-## 10. Initializing the cluster's etcd (bootstrapping)
+## Initializing the cluster's etcd (bootstrapping)
 
-  On ONLY one node run:
+On ONLY one control plane node run:
 
 ```shell
-talosctl bootstrap --nodes 10.2.0.11
+talosctl bootstrap --nodes 10.1.0.11 --endpoints 10.1.0.11
 ```
 
-  Wait a few minutes and monitor the console for when node is flagged as healthy in green
+Wait until STAGE is flagged as Running.
+
+Once the bootstrap process finishes, the other nodes are notified and automatically added to the cluster since they share the same secrets and are on the same network.
 
 ## 11. Configure kubectl
 
 ```shell
 # update kubeconfig file for use with kubectl
-talosctl kubeconfig --nodes 10.2.0.11
+talosctl kubeconfig --nodes 10.1.0.11
 
-# Command below should return that all nodes are "Ready"
+# Command below should normally return that all nodes are "Ready"
+# Since we disabled kube-proxy there isn't any communication within kubernetes and the command will fail.
+# Once Cilium is installed, the command below should eventually report all our nodes with a healthy state.
 kubectl get nodes
 ```
 
-## 12. Configuring Cilium CNI
+## Configuring Cilium CNI
 
 ```shell
-
 helm repo add cilium https://helm.cilium.io/
 helm repo update
 
 helm install \
     cilium \
     cilium/cilium \
-    --version 1.18.7 \
+    --version 1.19.5 \
     --namespace kube-system \
     --set ipam.mode=kubernetes \
     --set kubeProxyReplacement=true \
@@ -278,57 +297,27 @@ helm install \
     --set cgroup.hostRoot=/sys/fs/cgroup \
     --set k8sServiceHost=localhost \
     --set k8sServicePort=7445
-    --set=gatewayAPI.enabled=true \
-    --set=gatewayAPI.enableAlpn=true \
-    --set=gatewayAPI.enableAppProtocol=true
 
-# Wait for all pods to enter a Running stage. Multiple pod errors and restarts are expected during the process.
+# It'll take several minutes for the etcd configuration to propogate, for Cilium to enter a running state, and for the cluster to estabilish communication within kubernetes.
+
+# You'll know it's ready when all nodes have READY = True
+
+# Wait for all nodes to be healthy and pods to enter a Running stage.
+# Multiple pod errors and restarts are expected during the process
+kubectl get nodes
 kubectl get pods -A -w
-
 ```
 
-## 13. Configuring MetalLB
+## Configuring Longhorn on worker nodes
 
-Since we're using control plane nodes as workers, we need to remove the label that excludes control plane from load balancers. Create a patch file `controlplane-patch3-loadbalancer.yaml` with the following:
-
-```yaml
-machine:
-  nodeLabels:
-    node.kubernetes.io/exclude-from-external-load-balancers:
-      $patch: delete
-```
-
-and apply it to the cluster:
+I'm using V1 Data Engine.
+June 2 2026 update: The V2 Data Engine went GA with Longhorn 1.12 but I'm opting to wait longer before using it
 
 ```shell
-talosctl apply-config --nodes 10.2.0.11,10.2.0.12,10.2.0.13 --patch controlplane-patch3-loadbalancer.yaml
-```
+cd infrastructure/talos
 
-And now to deploy MetalLB:
-
-```shell
-# Create the namespace with required permission labels
-kubectl apply -f k8s/metallb/namespace_metallb-system.yaml
-
-# Prep helm with metallb repository
-helm repo add metallb https://metallb.github.io/metallb && helm repo update
-
-# Deploy metallb
-helm install metallb metallb/metallb \
-    --version 0.15.3 \
-    --namespace metallb-system
-
-# Configure IP Address pool and L2Advertisement.
-#   Address pool defines available IP ranges
-#   Advertisement is necessary for network connectivity.
-kubectl apply -f IPAddressPool.yaml
-```
-
-## 14. Configuring Longhorn
-
-```shell
 # Create and mount volume /var/mnt/longhorn using an available disk (our VM should have 2 disks, with 1 available)
-talosctl patch mc --patch @controlplane-patch2-longhorn-volume.yaml
+talosctl patch mc --patch @controlplane-patch2-longhorn-volume.yaml --nodes 10.1.0.21,10.1.0.22,10.1.0.23
 
 # Check if a "u-longhorn" (u for user volume) was mounted in each node
 talosctl get volumestatus | grep longhorn
@@ -336,34 +325,59 @@ talosctl get volumestatus | grep longhorn
 # Check if "u-longhorn" was mounted as "/var/mnt/longhorn" on each node
 talosctl get mounts | grep longhorn
 
+# Use this in case something went wrong and you need to "reset" the disk
 #talosctl wipe disk sdb1 --drop-partition
 ```
 
 ```shell
 # Create the longhorn namespace with pod security labels that it requires to function properly
-
 kubectl apply -f k8s/longhorn/namespace_longhorn-system.yaml
 
 helm repo add longhorn https://charts.longhorn.io && helm repo update
 
-helm install longhorn longhorn/longhorn --version 1.11.0 --namespace longhorn-system --values=k8s/longhorn/helm_values.yaml 
+helm install longhorn longhorn/longhorn --version 1.12.0 --namespace longhorn-system --values=k8s/longhorn/helm_values.yaml 
 
 # Wait for all pods to reach a running state
-kubectl -n longhorn-system get pod -w
+kubectl -n longhorn-system rollout status deploy/longhorn-driver-deployer
+kubectl get pods -n longhorn-system -w
 
 # longhorn should be the default storage class
 kubectl get storageclass
 
 # In case longhorn isn't the default, the patch command below can be used to make it sot.
 kubectl patch storageclass longhorn \
-#  -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+  -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 
-
+# To connect to the longhorn Web UI:
 kubectl port-forward service/longhorn-frontend 8080:80 -n longhorn-system
 #  access the UI from <http://localhost:8080>
 ```
 
-## 15. Configuring Metric Server
+Test Longhorn by creating a PesistantVolumeClaim
+
+```shell
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: longhorn-test-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+EOF
+
+# It should report with status Bound. If it's stuck on Pending, check if all the Longhorn pods are running
+kubectl get pvc longhorn-test-pvc
+
+# Cleanup
+kubectl delete pvc longhorn-test-pvc
+```
+
+## Configuring Metric Server
 
 It should have been automatically deployed during the bootstrap based on the defined machine configurations. Use the following to test:
 
@@ -375,10 +389,11 @@ kubectl top nodes
 #node12   432m         5%     2700Mi          36%       
 #node13   1311m        16%    1429Mi          19%  
 #
-# If a node reports unknown or an the metric api is unavailable, the deployment failed
+# If the metric api is unavailable, the metric server wasn't deployed.
+# If some nodes are unknown, the nodes are probably missing the "rotate-server-certificates : true" parameter
 
 # Use the below to get prometheus style export of all metrics
-curl 10.2.0.11:2381/metrics
+curl 10.1.0.11:2381/metrics
 ```
 
 In case the case the metric server wasn't auto deployed during the bootstrap, use the following:

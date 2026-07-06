@@ -1,19 +1,22 @@
 # Based on https://artifacthub.io/packages/helm/longhorn/longhorn
 
-image:
-  longhorn:
-    manager:
+#image:
+#  longhorn:
+#    manager:
       # -- Tag for the Longhorn Manager image.
+      # If install v1.11.0:
       # Using hotfix due to regression remediation: https://github.com/longhorn/longhorn/releases/tag/v1.11.0
-      tag: v1.11.0-hotfix-1
-    instanceManager:
+      #tag: v1.11.0-hotfix-1
+#    instanceManager:
       # -- Tag for the Longhorn Instance Manager image.
+      # If install v1.11.0:
       # Using hotfix due to regression remediation: https://github.com/longhorn/longhorn/releases/tag/v1.11.0
-      tag: v1.11.0-hotfix-1
-preUpgradeChecker:
+      #tag: v1.11.0-hotfix-1
+#preUpgradeChecker:
   # -- Setting that allows Longhorn to perform upgrade version checks after starting the Longhorn Manager DaemonSet Pods. Disabling this setting also disables `preUpgradeChecker.jobEnabled`. Longhorn recommends keeping this setting enabled.
+  # If install v1.11.0:
   # Set to "false" due to regression remediation: https://github.com/longhorn/longhorn/releases/tag/v1.11.0
-  upgradeVersionCheck: false
+  #upgradeVersionCheck: false
 
 defaultSettings:
   # Default number of replicas when creating volumes in the longhorn UI

@@ -2,6 +2,65 @@
 
 ## Maintenance
 
+### Updating local commands
+
+#### Terraform
+
+Repo was added to apt.
+See <https://developer.hashicorp.com/terraform/install> for the latest instructions
+
+```shell
+sudo apt update && sudo apt install terraform
+```
+
+#### talosctl
+
+Installed using script (alternative is using brew)
+See <https://docs.siderolabs.com/talos/v1.13/getting-started/talosctl#talosctl> for the latest instructions
+The talosctl version (talosctl version --client) should match the Talos OS version installed on your nodes. If you are using a newer version of talosctl to generate configurations for an older Talos OS, use the --talos-version flag to ensure compatibility. For example, to generate a configuration compatible with Talos v1.13:
+
+```shell
+curl -sL https://talos.dev/install | sh
+```
+
+#### kubectl
+
+You must use a kubectl version that is within one minor version difference of your cluster. For example, a v1.36 client can communicate with v1.35, v1.36, and v1.37 control planes. Using the latest compatible version of kubectl helps avoid unforeseen issues.
+See <https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/> for the latest instructions.
+
+Latest stable:
+```shell
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+```
+
+Specific major release
+See <https://dl.k8s.io/release/stable.txt> for the latest stable version
+Minor releases are included in the same repo, using the same GPG key, of the major release.
+
+```shell
+kubernetes_version="v1.36"
+
+# GPG key (new one for every major release)
+curl -fsSL https://pkgs.k8s.io/core:/stable:/$(echo $kubernetes_version | cut -d"." -f1-2)/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg # allow unprivileged APT programs to read this keyring
+
+### apt repo config (for specific minor release)
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$(echo $kubernetes_version | cut -d"." -f1-2)/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list # allow unprivileged programs to read the file
+
+sudo apt-get update
+sudo apt-get install -y kubectl
+```
+
+#### helm
+
+Repo was added to apt.
+See <https://helm.sh/docs/intro/install/> for the latest instructions
+
+```shell
+sudo apt update && sudo apt install helm
+```
+
 ### Checking Talos system extensions
 
 System extensions are defined in images, which can be created using <https://factory.talos.dev>.
@@ -142,6 +201,26 @@ To avoid unavailability of services, apply the upgrade incrementally.
 
 Note that Kubernetes is not upgraded automatically, with image updates on an existing cluster, to avoid issues.
 
+### Removing context from kubectl
+
+Useful if the previous cluster was discontinued and/or configurations are no longer valid.
+
+```shell
+kubectl config get-clusters
+# for each run: kubectl config delete-cluster <name>
+
+kubectl config get-contexts
+# for each run: kubectl config delete-context <name>
+
+kubectl config get-users
+# for each run: kubectl config delete-users <name>
+
+kubectl config current-context
+kubectl config unset current-context
+```
+
+
+
 ## Troubleshooting
 
 ### /dev/sda not being found
@@ -151,5 +230,9 @@ As per the talos documentation, it will by default try to install to /dev/sda. D
 To check the current disks on a node use the command below:
 
 ```shell
+# Uninstalled nodes
 talosctl get disks --insecure --nodes <ip>
+
+# Installed nodes
+talosctl get disks --nodes <ip>
 ```

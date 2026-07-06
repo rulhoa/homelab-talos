@@ -12,7 +12,7 @@ locals {
       tags       = ["k8s-control-plane", "talos"]
       ip_address = "10.1.0.11/24"
       cpu_cores  = 4
-      memory     = { dedicated = 2048, floating = 1024 }
+      memory     = { dedicated = 2048, floating = 2048 } # Avoid using lower floating memory as it just confuses k8s
       disks      = [{ interface = "scsi0", size = 20 }]
     }
     cp_2 = {
@@ -20,7 +20,7 @@ locals {
       tags       = ["k8s-control-plane", "talos"]
       ip_address = "10.1.0.12/24"
       cpu_cores  = 4
-      memory     = { dedicated = 2048, floating = 1024 }
+      memory     = { dedicated = 2048, floating = 2048 } # Avoid using lower floating memory as it just confuses k8s
       disks      = [{ interface = "scsi0", size = 20 }]
     }
     cp_3 = {
@@ -28,7 +28,7 @@ locals {
       tags       = ["k8s-control-plane", "talos"]
       ip_address = "10.1.0.13/24"
       cpu_cores  = 4
-      memory     = { dedicated = 2048, floating = 1024 }
+      memory     = { dedicated = 2048, floating = 2048 } # Avoid using lower floating memory as it just confuses k8s
       disks      = [{ interface = "scsi0", size = 20 }]
     }
 
@@ -39,7 +39,7 @@ locals {
       tags       = ["k8s-worker", "talos"]
       ip_address = "10.1.0.21/24"
       cpu_cores  = 4
-      memory     = { dedicated = 4096, floating = 2048 }
+      memory     = { dedicated = 4096, floating = 4096 } # Avoid using lower floating memory as it just confuses k8s
       disks = [
         { interface = "scsi0", size = 30 },  # OS Disk
         { interface = "scsi1", size = 100 }, # Data Disk
@@ -50,7 +50,7 @@ locals {
       tags       = ["k8s-worker", "talos"]
       ip_address = "10.1.0.22/24"
       cpu_cores  = 4
-      memory     = { dedicated = 4096, floating = 2048 }
+      memory     = { dedicated = 4096, floating = 4096 } # Avoid using lower floating memory as it just confuses k8s
       disks = [
         { interface = "scsi0", size = 30 },  # OS Disk
         { interface = "scsi1", size = 100 }, # Data Disk
@@ -61,7 +61,7 @@ locals {
       tags       = ["k8s-worker", "talos"]
       ip_address = "10.1.0.23/24"
       cpu_cores  = 4
-      memory     = { dedicated = 4096, floating = 2048 }
+      memory     = { dedicated = 4096, floating = 4096 } # Avoid using lower floating memory as it just confuses k8s
       disks = [
         { interface = "scsi0", size = 30 },  # OS Disk
         { interface = "scsi1", size = 100 }, # Data Disk
