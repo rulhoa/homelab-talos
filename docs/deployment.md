@@ -288,7 +288,7 @@ Wait until STAGE is flagged as Running.
 
 Once the bootstrap process finishes, the other nodes are notified and automatically added to the cluster since they share the same secrets and are on the same network.
 
-## 11. Configure kubectl
+## Configure kubectl
 
 ```shell
 # update kubeconfig file for use with kubectl

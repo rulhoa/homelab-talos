@@ -12,17 +12,17 @@
 - **Ingress:** Traefik (planned)
 - **Metrics:** Metrics Server
 
-### Virtualization
+## Virtualization
 
 Proxmox is an open-source virtualization platform based on KVM and used in enterprise and homelab settings.
 
 I used my pre-existing local Proxmox cluster to setup this project.
 
-### IaC
+## IaC
 
 Terraform was picked for convenience, but the used syntax and provider are also applicable for those that prefer to use OpenTofu.
 
-### Kubernetes (k8s)
+## Kubernetes (k8s)
 
 Talos OS (by Sidero) is an immutable Linux distribution optimized for provisioning kubernetes.
 
@@ -30,13 +30,13 @@ Immutable means that the OS filesystem can't be changed after installation, and 
 
 Optimized means that it is lightweight, more secure, and predictable in relation to other distributions of Linux and K8S.
 
-#### Container Runtime Interface (CRI)
+### Container Runtime Interface (CRI)
 
 Used the Talos default of **containerd** as it's sufficient for all but specialized workloads.
 
-### Networking
+## Networking
 
-#### Container Network Interface (CNI)
+### Container Network Interface (CNI)
 
 This is for the internal network between k8s nodes.
 
@@ -46,7 +46,7 @@ Other alternatives are Flannel, Calico, kube-router, and Multus (among others) a
 
 As a bonus, Cilium comes with **Hubble** that provides observability of Cilium itself.
 
-#### Ingress & Services
+### Ingress & Services
 
 Future plan:
 
@@ -54,7 +54,7 @@ Future plan:
 - **Ingress Controller**: Traefik
 - **Gateway API**
 
-### Storage Layer (CSI)
+## Storage Layer (CSI)
 
 **Engine**: Longhorn distributed block storage:
 
@@ -68,12 +68,6 @@ Setup:
 - **Storage Overcommit**: 500%
   - Not expecting all services to fully use allocated space.
   - This is a study lab and right sizing is not a priority.
-
-## Disclaimers
-
-> [!IMPORTANT]
-> This cluster should NOT be exposed to the Internet.
-> Its goal is for homelabbing for studying purposes, and internet facing service require additional security measures and tools beyond the scope of this project.
 
 ## Cluster Topology
 
@@ -89,3 +83,9 @@ A second network for LoadBalancer services are available in 10.1.1.0/24 with gat
 > [!TIP]
 > Choices were made to make it easier to remember IP roles at-a-glance, and simplify administration.
 > An enterprise deployment may segregate IP roles into different private and public networks.
+
+## Disclaimers
+
+> [!IMPORTANT]
+> This cluster should NOT be exposed to the Internet.
+> Its goal is for homelabbing for studying purposes, and internet facing service require additional security measures and tools beyond the scope of this project.
