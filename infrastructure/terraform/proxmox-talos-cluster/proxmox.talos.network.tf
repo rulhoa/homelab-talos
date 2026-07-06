@@ -32,15 +32,25 @@ resource "proxmox_sdn_vnet" "talos_sdn_vnet" {
   ]
 }
 
-resource "proxmox_sdn_subnet" "talos_sdn_vnet_subnet" {
-  cidr    = "10.1.0.0/16"
+resource "proxmox_sdn_subnet" "talos_sdn_vnet_subnet0" {
+  cidr    = "10.1.0.0/24"
   vnet    = proxmox_sdn_vnet.talos_sdn_vnet.id
   gateway = "10.1.0.1"
 
   dhcp_range = {
-    start_address = "10.1.0.11"
-    end_address = "10.1.0.99"
+    start_address = "10.1.0.100"
+    end_address = "10.1.0.150"
   }
+
+  depends_on = [
+    proxmox_sdn_applier.finalizer
+  ]
+}
+
+resource "proxmox_sdn_subnet" "talos_sdn_vnet_subnet1" {
+  cidr    = "10.1.1.0/24"
+  vnet    = proxmox_sdn_vnet.talos_sdn_vnet.id
+  gateway = "10.1.1.1"
 
   depends_on = [
     proxmox_sdn_applier.finalizer
@@ -65,7 +75,8 @@ resource "proxmox_sdn_applier" "applier" {
   depends_on = [
     proxmox_sdn_zone_simple.talos_sdn,
     proxmox_sdn_vnet.talos_sdn_vnet,
-    proxmox_sdn_subnet.talos_sdn_vnet_subnet
+    proxmox_sdn_subnet.talos_sdn_vnet_subnet0,
+    proxmox_sdn_subnet.talos_sdn_vnet_subnet1
   ]
 }
 

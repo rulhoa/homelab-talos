@@ -4,49 +4,66 @@ locals {
   talos_gateway = "10.1.0.1"
 
   talos_vms = {
+
+    ## Control Plane Nodes
+
     cp_1 = {
       hostname   = "talos-cp-1"
       tags       = ["k8s-control-plane", "talos"]
-      ip_address = "10.1.0.11/16"
+      ip_address = "10.1.0.11/24"
       cpu_cores  = 4
       memory     = { dedicated = 2048, floating = 1024 }
-      disks      = [{ interface = "scsi0", size = 10 }]
+      disks      = [{ interface = "scsi0", size = 20 }]
     }
     cp_2 = {
       hostname   = "talos-cp-2"
       tags       = ["k8s-control-plane", "talos"]
-      ip_address = "10.1.0.12/16"
+      ip_address = "10.1.0.12/24"
       cpu_cores  = 4
       memory     = { dedicated = 2048, floating = 1024 }
-      disks      = [{ interface = "scsi0", size = 10 }]
+      disks      = [{ interface = "scsi0", size = 20 }]
     }
     cp_3 = {
       hostname   = "talos-cp-3"
       tags       = ["k8s-control-plane", "talos"]
-      ip_address = "10.1.0.13/16"
+      ip_address = "10.1.0.13/24"
       cpu_cores  = 4
       memory     = { dedicated = 2048, floating = 1024 }
-      disks      = [{ interface = "scsi0", size = 10 }]
+      disks      = [{ interface = "scsi0", size = 20 }]
     }
+
+    ## Worker Nodes
+
     worker_1 = {
       hostname   = "talos-worker-1"
       tags       = ["k8s-worker", "talos"]
-      ip_address = "10.1.0.21/16"
+      ip_address = "10.1.0.21/24"
       cpu_cores  = 4
       memory     = { dedicated = 4096, floating = 2048 }
       disks = [
-        { interface = "scsi0", size = 10 },  # OS Disk
+        { interface = "scsi0", size = 30 },  # OS Disk
         { interface = "scsi1", size = 100 }, # Data Disk
       ]
     }
     worker_2 = {
       hostname   = "talos-worker-2"
       tags       = ["k8s-worker", "talos"]
-      ip_address = "10.1.0.22/16"
+      ip_address = "10.1.0.22/24"
       cpu_cores  = 4
       memory     = { dedicated = 4096, floating = 2048 }
       disks = [
-        { interface = "scsi0", size = 10 },  # OS Disk
+        { interface = "scsi0", size = 30 },  # OS Disk
+        { interface = "scsi1", size = 100 }, # Data Disk
+      ]
+    }
+    worker_3 = {
+      hostname   = "talos-worker-3"
+      tags       = ["k8s-worker", "talos"]
+      ip_address = "10.1.0.23/24"
+      cpu_cores  = 4
+      memory     = { dedicated = 4096, floating = 2048 }
+      disks = [
+        { interface = "scsi0", size = 30 },  # OS Disk
         { interface = "scsi1", size = 100 }, # Data Disk
       ]
     }
