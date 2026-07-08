@@ -330,6 +330,68 @@ kubectl get nodes
 kubectl get pods -A -w
 ```
 
+> [!WARNING]
+> The Cilium project is now recommending the use of OCI images is place of helm for better security.
+
+Enable Hubble which is observability layer of Cilium.
+
+```shell
+helm upgrade cilium cilium/cilium --version 1.19.5 \
+   --namespace kube-system \
+   --reuse-values \
+   --set hubble.relay.enabled=true
+```
+
+Enable Cilium as a loadbalancer service.
+We need to enable and configure IPAM and L2 announcements (to respond to arp "how has the IP" requests)
+
+```shell
+helm upgrade cilium cilium/cilium --version 1.19.5 \
+   --namespace kube-system \
+   --reuse-values \
+   --set nodeIPAM.enabled=true \
+   --set l2announcements.enabled=true
+
+kubectl -n kube-system rollout restart ds/cilium
+kubectl -n kube-system rollout restart deployment/cilium-operator
+kubectl -n kube-system rollout status ds/cilium
+
+# Check if the L2 announcement has been enabled
+kubectl -n kube-system exec ds/cilium -- cilium-dbg config --all | grep EnableL2Announcements
+# should print: EnableL2Announcements   : true
+
+# Apply the loadbalancer IP pool. Edit as necessary
+kubectl apply -f k8s/cilium/cilium-loadbalancer-ip-pool.yaml
+# The CiliumLoadBalancerIPPool is a cluster-scoped resource, and doesn't live within any particular namespace
+
+# Enable L2 announcement to external and loadbalancer IPs
+kubectl apply -f l2-announcement-policy.yaml
+```
+
+Test the loadbalancer with:
+
+```shell
+# Create an nginx pod
+kubectl run nginx --image=nginx:1.27 --port=80 --labels=app=nginx
+
+# Create the LoadBalancer service, targeting pods with label app=nginx
+kubectl expose pod nginx --name=nginx-lb --port=80 --target-port=80 --type=LoadBalancer
+
+# check if the service got an external-ip
+kubectl get service | grep nginx
+# make note of the external-ip
+
+# From a different machine execute
+curl -fsSL <external-ip>:80
+# You should get a standard new nginx welcome html
+
+# Cleanup
+kubectl delete svc nginx-lb
+kubectl delete pod nginx
+
+
+```
+
 ## Configuring Longhorn on worker nodes
 
 I'm using V1 Data Engine.

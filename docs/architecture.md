@@ -8,7 +8,7 @@
   - **Container Runtime Interface (CRI):** containerd (Talos default)
   - **Container Network Interface (CNI):** [Cilium](https://docs.cilium.io/en/stable/overview/intro/)
   - **Container Storage Interface (CSI):** Longhorn
-- **Load Balancer:**  [Cilium LB IPAM](https://docs.cilium.io/en/stable/network/lb-ipam/) (planned)
+- **Load Balancer:**  [Cilium LB IPAM](https://docs.cilium.io/en/stable/network/lb-ipam/)
 - **Ingress:** Traefik (planned)
 - **Metrics:** Metrics Server
 
@@ -48,9 +48,10 @@ As a bonus, Cilium comes with **Hubble** that provides observability of Cilium i
 
 ### Ingress & Services
 
+- **Load Balancer**: [Cilium LB IPAM](https://docs.cilium.io/en/stable/network/lb-ipam/)
+
 Future plan:
 
-- **Load Balancer**: [Cilium LB IPAM](https://docs.cilium.io/en/stable/network/lb-ipam/)
 - **Ingress Controller**: Traefik
 - **Gateway API**
 

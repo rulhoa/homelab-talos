@@ -13,7 +13,7 @@ The Talos cluster configurations are done with talosctl, kubectl, and helm.
   - **Container Runtime Interface (CRI):** containerd (Talos default)
   - **Container Network Interface (CNI):** [Cilium](https://docs.cilium.io/en/stable/overview/intro/)
   - **Container Storage Interface (CSI):** Longhorn
-- **Load Balancer:** [Cilium LB IPAM](https://docs.cilium.io/en/stable/network/lb-ipam/) (planned)
+- **Load Balancer:** [Cilium LB IPAM](https://docs.cilium.io/en/stable/network/lb-ipam/)
 - **Ingress:** Traefik (planned)
 - **Metrics:** Metrics Server
 

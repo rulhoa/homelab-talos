@@ -236,3 +236,28 @@ talosctl get disks --insecure --nodes <ip>
 # Installed nodes
 talosctl get disks --nodes <ip>
 ```
+
+### Troubleshooting services using Cilium's LoadBalancer (IPAM)
+
+Check if a `CiliumLoadBalancerIPPool` exists and aren't conflicting (e.g. have overlapping CIDRs). Conflicted pools are skipped for allocations.
+
+```shell
+kubectl get ippools
+
+# If conflicts are detected use:
+kubectl get ippools/<name> -o jsonpath='{.status.conditions[?(@.type=="cilium.io/PoolConflict")].message}'
+#e.g. output: Pool conflicts since CIDR '20.0.10.0/24' overlaps CIDR '20.0.10.0/24' from IP Pool 'blue-pool'
+#or
+kubectl describe ippools/<name>
+
+# Additional information may be available on the service request
+kubectl get svc/<name> --o json | jq .status
+# "message": "There are no enabled CiliumLoadBalancerIPPools that match this service",
+```
+
+Add `.spec.disabled: true` to any pool to disable it.
+
+> [!WARN]
+> Any changes to pool definitions are applied immediately, which may cause services to loose their current external-ip
+
+further documentation in the official [Cilium docs](https://docs.cilium.io/en/stable/network/lb-ipam/#loadbalancer-ip-address-management-lb-ipam).
