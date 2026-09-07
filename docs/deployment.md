@@ -319,6 +319,8 @@ helm install \
     --set cgroup.hostRoot=/sys/fs/cgroup \
     --set k8sServiceHost=localhost \
     --set k8sServicePort=7445
+    --set prometheus.enabled=true \
+    --set operator.prometheus.enabled=true \
 
 # It'll take several minutes for the etcd configuration to propogate, for Cilium to enter a running state, and for the cluster to estabilish communication within kubernetes.
 
@@ -331,7 +333,7 @@ kubectl get pods -A -w
 ```
 
 > [!WARNING]
-> The Cilium project is now recommending the use of OCI images is place of helm for better security.
+> The Cilium project is now recommending the use of OCI images is place of helm repos for better security.
 
 Enable Hubble which is observability layer of Cilium.
 
@@ -388,9 +390,59 @@ curl -fsSL <external-ip>:80
 # Cleanup
 kubectl delete svc nginx-lb
 kubectl delete pod nginx
+```
 
+### Upgrading from Cilium 1.19.5 to 1.20.1 (release upgrade)
+
+Source: [Cilium 1.20 upgrade notes](https://docs.cilium.io/en/v1.20/operations/upgrade/#upgrade-notes)
+
+```shell
+# Make sure helm repos are updated
+helm repo update
+
+# Pre-flight setup so that images are pre-downloaded and validated before network is cut-out when cilium is being upgraded
+helm template cilium/cilium --version 1.20.1 \
+   --namespace kube-system \
+   --set preflight.enabled=true \
+   --set agent=false \
+   --set operator.enabled=false \
+   --set k8sServiceHost=localhost \
+   --set k8sServicePort=7445 \
+   > cilium-preflight.yaml
+kubectl create -f cilium-preflight.yaml
+
+# Check if the pre-flight daemonset is fully running and have the same number of ready pods as the other pre-existing cilium daemonsets
+kubectl get daemonset -n kube-system | sed -n '1p;/cilium/p'
+
+# Cleanup
+kubectl delete -f cilium-preflight.yaml
+
+# To upgrade using helm, we can't use the "--reuse-values" flag as it ignores new values introduced in new charts, which WILL cause issues
+# To the the existing list of set values we can use:
+# helm get values cilium --namespace=kube-system -o yaml > old-values.yaml
+
+helm upgrade cilium cilium/cilium --version 1.20.1 \
+   --namespace kube-system \
+   --set upgradeCompatibility=1.19.5 \
+    --set ipam.mode=kubernetes \
+    --set kubeProxyReplacement=true \
+    --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
+    --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}" \
+    --set cgroup.autoMount.enabled=false \
+    --set cgroup.hostRoot=/sys/fs/cgroup \
+    --set k8sServiceHost=localhost \
+    --set k8sServicePort=7445 \
+    --set hubble.relay.enabled=true \
+    --set nodeIPAM.enabled=true \
+    --set l2announcements.enabled=true \
+    --set prometheus.enabled=true \
+    --set operator.prometheus.enabled=true
+
+# Update the loadbalancer-l2-policy to use the new apiVersion cilium.io/v2
+kubectl apply -f l2-announcement-policy-v2.yaml
 
 ```
+
 
 ## Configuring Longhorn on worker nodes
 
