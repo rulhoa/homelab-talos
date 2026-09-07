@@ -22,6 +22,10 @@ I used my pre-existing local Proxmox cluster to setup this project.
 
 Terraform was picked for convenience, but the used syntax and provider are also applicable for those that prefer to use OpenTofu.
 
+The used provider is [bpg/proxmox](https://registry.terraform.io/providers/bpg/proxmox/latest/docs)
+
+For additional information, I recommend reading <https://spacelift.io/blog/terraform-proxmox-provider>
+
 ## Kubernetes (k8s)
 
 Talos OS (by Sidero) is an immutable Linux distribution optimized for provisioning kubernetes.
