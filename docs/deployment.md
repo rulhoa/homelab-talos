@@ -411,7 +411,7 @@ helm template cilium/cilium --version 1.20.1 \
    > cilium-preflight.yaml
 kubectl create -f cilium-preflight.yaml
 
-# Check if the pre-flight daemonset is fully running and have the same number of ready pods as the other pre-existing cilium daemonsets
+# Check if the pre-flight daemonset is fully running and have the same number of ready and available pods as the other pre-existing cilium daemonsets
 kubectl get daemonset -n kube-system | sed -n '1p;/cilium/p'
 
 # Cleanup
@@ -437,12 +437,52 @@ helm upgrade cilium cilium/cilium --version 1.20.1 \
     --set l2announcements.enabled=true \
     --set prometheus.enabled=true \
     --set operator.prometheus.enabled=true
-
-# Update the loadbalancer-l2-policy to use the new apiVersion cilium.io/v2
-kubectl apply -f l2-announcement-policy-v2.yaml
-
 ```
 
+### Upgrading from Cilium 1.20.1 to 1.20.2 (patch upgrade)
+
+```shell
+# Make sure helm repos are updated
+helm repo update
+
+# Pre-flight setup so that images are pre-downloaded and validated before network is cut-out when cilium is being upgraded
+helm template cilium/cilium --version 1.20.2 \
+   --namespace kube-system \
+   --set preflight.enabled=true \
+   --set agent=false \
+   --set operator.enabled=false \
+   --set k8sServiceHost=localhost \
+   --set k8sServicePort=7445 \
+   > cilium-preflight.yaml
+kubectl create -f cilium-preflight.yaml
+
+# Check if the pre-flight daemonset is fully running and have the same number of ready and available pods as the other pre-existing cilium daemonsets
+kubectl get daemonset -n kube-system | sed -n '1p;/cilium/p'
+
+# Cleanup
+kubectl delete -f cilium-preflight.yaml
+
+# To upgrade using helm, we can't use the "--reuse-values" flag as it ignores new values introduced in new charts, which WILL cause issues
+# To the the existing list of set values we can use:
+# helm get values cilium --namespace=kube-system -o yaml > old-values.yaml
+
+helm upgrade cilium cilium/cilium --version 1.20.2 \
+   --namespace kube-system \
+   --set upgradeCompatibility=1.20.1 \
+    --set ipam.mode=kubernetes \
+    --set kubeProxyReplacement=true \
+    --set securityContext.capabilities.ciliumAgent="{CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}" \
+    --set securityContext.capabilities.cleanCiliumState="{NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}" \
+    --set cgroup.autoMount.enabled=false \
+    --set cgroup.hostRoot=/sys/fs/cgroup \
+    --set k8sServiceHost=localhost \
+    --set k8sServicePort=7445 \
+    --set hubble.relay.enabled=true \
+    --set nodeIPAM.enabled=true \
+    --set l2announcements.enabled=true \
+    --set prometheus.enabled=true \
+    --set operator.prometheus.enabled=true
+```
 
 ## Configuring Longhorn on worker nodes
 

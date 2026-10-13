@@ -14,7 +14,7 @@ metadata:
   name: cilium-pre-flight
   labels:
     app.kubernetes.io/part-of: cilium
-    helm.sh/chart: cilium-1.20.1
+    helm.sh/chart: cilium-1.20.2
 rules:
 - apiGroups:
   - networking.k8s.io
@@ -128,7 +128,7 @@ metadata:
   name: cilium-pre-flight
   labels:
     app.kubernetes.io/part-of: cilium
-    helm.sh/chart: cilium-1.20.1
+    helm.sh/chart: cilium-1.20.2
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -158,7 +158,7 @@ spec:
         app.kubernetes.io/part-of: cilium
         k8s-app: cilium-pre-flight-check
         app.kubernetes.io/name: cilium-pre-flight-check
-        helm.sh/chart: cilium-1.20.1
+        helm.sh/chart: cilium-1.20.2
         kubernetes.io/cluster-service: "true"
     spec:
       affinity:
@@ -170,7 +170,7 @@ spec:
             topologyKey: kubernetes.io/hostname
       initContainers:
         - name: clean-cilium-state
-          image: "quay.io/cilium/cilium:v1.20.1@sha256:ae9ea21f7427fe24bc6ea7247eb552157a1b0a431744045d3f641545ca71d11b"
+          image: "quay.io/cilium/cilium:v1.20.2@sha256:2939231d0d3e3ebddcd80fffa168b7ddcc78fdf0dc864d1c8c126ff523c54f01"
           imagePullPolicy: IfNotPresent
           command: ["/bin/echo"]
           args:
@@ -178,7 +178,7 @@ spec:
           terminationMessagePolicy: FallbackToLogsOnError
       containers:
         - name: cilium-pre-flight-check
-          image: "quay.io/cilium/cilium:v1.20.1@sha256:ae9ea21f7427fe24bc6ea7247eb552157a1b0a431744045d3f641545ca71d11b"
+          image: "quay.io/cilium/cilium:v1.20.2@sha256:2939231d0d3e3ebddcd80fffa168b7ddcc78fdf0dc864d1c8c126ff523c54f01"
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh"]
           args:
@@ -211,7 +211,7 @@ spec:
               allowPrivilegeEscalation: false
           terminationMessagePolicy: FallbackToLogsOnError
         - name: cilium-pre-flight-envoy
-          image: "quay.io/cilium/cilium-envoy:v1.37.5-1786810558-766ccfb37260a43e9d228837aa84ce3faf9f64e7@sha256:75b8094c7127736a2ffd2dce3945e0931cb6df21b0372ff661940eca26730b91"
+          image: "quay.io/cilium/cilium-envoy:v1.37.6-1789133542-cbec91f666af0bf742da986d43832932dbb26b82@sha256:af7382699576b9e65e9184efa52eeca0b58aea70ad6e511bf260c91d9f740463"
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh"]
           args:
@@ -282,7 +282,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: cilium
     app.kubernetes.io/name: cilium-pre-flight-check
-    helm.sh/chart: cilium-1.20.1
+    helm.sh/chart: cilium-1.20.2
 spec:
   selector:
     matchLabels:
@@ -295,11 +295,11 @@ spec:
         k8s-app: cilium-pre-flight-check-deployment
         kubernetes.io/cluster-service: "true"
         app.kubernetes.io/name: cilium-pre-flight-check
-        helm.sh/chart: cilium-1.20.1
+        helm.sh/chart: cilium-1.20.2
     spec:
       containers:
         - name: cnp-validator
-          image: "quay.io/cilium/cilium:v1.20.1@sha256:ae9ea21f7427fe24bc6ea7247eb552157a1b0a431744045d3f641545ca71d11b"
+          image: "quay.io/cilium/cilium:v1.20.2@sha256:2939231d0d3e3ebddcd80fffa168b7ddcc78fdf0dc864d1c8c126ff523c54f01"
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh"]
           args:
@@ -317,9 +317,9 @@ spec:
             periodSeconds: 5
           env:
           - name: KUBERNETES_SERVICE_HOST
-            value: "API_SERVER_IP"
+            value: "localhost"
           - name: KUBERNETES_SERVICE_PORT
-            value: "API_SERVER_PORT"
+            value: "7445"
           terminationMessagePolicy: FallbackToLogsOnError
       hostNetwork: true
       hostUsers: true
