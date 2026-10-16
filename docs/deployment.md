@@ -75,7 +75,7 @@ THe second version is what we actually want the cluster install and run. Since T
 Settings used:
 
 - **Hardware type**: Cloud Server (recommended for Proxmox)
-- **Talos version**: 1.13.5
+- **Talos version**: 1.14.2
 - **Cloud**: Nocloud (recommended for Proxmox)
 - **Machine Architecture**: amd64 (Secureboot disabled)
 - **System Extensions**:
@@ -85,6 +85,8 @@ Settings used:
 - **Customization**: default options
 
 After selecting the options above, the final page will contain links and ids. Copy the id string in "Initial Installation" section:
+
+Example:
 
 ```text
 factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.13.5 
@@ -108,32 +110,14 @@ talosctl gen secrets -o secrets.yaml
 
 # Generate initial machine configs
 ## Change "talos" to whatever is the desired cluster name
-## change "k8s.internal.salesulhoa.com" to whatever IP/FQDN is being used
 ## Change the "--install-image" value to the custom image ID generated previously;
-## Change the "--dns-domain" value to the desired FQDN, or just remove this optional setting.
-talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --dns-domain k8s.internal.salesulhoa.com --install-image factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.13.5 --with-secrets secrets.yaml
+talosctl gen config talos https://k8s.internal.salesulhoa.com:6443 --install-image factory.talos.dev/nocloud-installer/ce4c980550dd2ab1b17bbf2b08801c7eb59418eafe8f279833297925d67c7515:v1.14.2 --with-secrets secrets.yaml
 ```
 
 The following "machine config" files should have been generated:
 
 - controlplane.yaml
 - worker.yaml
-
-For future reference, the desired image can be updated manually in each of the machine configuration jsons by editing the section:
-
-```yaml
-machine:
-  install:
-    image: <desired image id>
-```
-
-example:
-
-```yaml
-machine:
-  install:
-    image: factory.talos.dev/nocloud-installer/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b:v1.12.4
-```
 
 > [!WARNING]
 > Nodes that have had an image already installed require the use of the command `talosctl upgrade` to update.
@@ -148,55 +132,46 @@ Manually edit the mc files with the following:
 
 #### Cilium CNI
 
-Manually edit both the `controlplane.yaml` to add the following configurations required for Cilium CNI. It disables kube-proxy so we can fully use Cilium later in the guide.
+Manually edit the end of `controlplane.yaml` to add the following configurations required for Cilium CNI. It disables kube-proxy so we can fully use Cilium later in the guide.
 
 ```yaml
-cluster:
-  network:
-    cni:
-      name: none
-  proxy:
-    disabled: true
+---
+apiVersion: v1alpha1
+kind: KubeFlannelCNIConfig
+$patch: delete
+---
+apiVersion: v1alpha1
+kind: KubeProxyConfig
+enabled: false
 ```
 
 #### Longhorn
 
-Since only the worker nodes will be running LongHorn, manually edit the `worker.yaml` to add the following required kernel modules:
+Since only the worker nodes will be running LongHorn, manually edit the `worker.yaml` to add the following required kernel modules to the end of the file as a patch:
 
 ```yaml
-machine:
-  kernel:
-    modules:
-      - name: nbd
-      - name: iscsi_tcp
-      - name: configfs
-```
+---
+apiVersion: v1alpha1
+kind: SysctlConfig
+params:
+    vm.nr_hugepages: "1024"
+---
+apiVersion: v1alpha1
+kind: KernelModuleConfig
+name: nvme_tcp
+---
+apiVersion: v1alpha1
+kind: KernelModuleConfig
+name: vfio_pci
+---
+apiVersion: v1alpha1
+kind: KernelModuleConfig
+name: uio_pci_generic
+---
+apiVersion: v1alpha1
+kind: KernelModuleConfig
+name: ublk_drv
 
-#### Metric Server
-
-Edit the `controlplane.yaml` to add the following configurations:
-
-```yaml
-machine:
-  kubelet:
-    extraArgs:
-      rotate-server-certificates: true
-cluster:
-  etcd:
-    extraArgs:
-      listen-metrics-urls: http://0.0.0.0:2381
-  extraManifests:
-    - https://raw.githubusercontent.com/alex1989hu/kubelet-serving-cert-approver/main/deploy/standalone-install.yaml
-    - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
-```
-
-Edit the `worker.yaml` to add the following configurations:
-
-```yaml
-machine:
-  kubelet:
-    extraArgs:
-      rotate-server-certificates: true
 ```
 
 ## Prepare talosctl environment
@@ -257,7 +232,6 @@ Wait for talos to finish booting in each VM, in a few minutes
   Apply control plane configuration to each node:
 
 ```shell
-# Con
 talosctl apply-config --insecure --nodes 10.1.0.11 --file controlplane.yaml
 talosctl apply-config --insecure --nodes 10.1.0.12 --file controlplane.yaml
 talosctl apply-config --insecure --nodes 10.1.0.13 --file controlplane.yaml
@@ -287,6 +261,8 @@ talosctl bootstrap --nodes 10.1.0.11 --endpoints 10.1.0.11
 Wait until STAGE is flagged as Running.
 
 Once the bootstrap process finishes, the other nodes are notified and automatically added to the cluster since they share the same secrets and are on the same network.
+
+Note that if kube-proxy is disabled (what we're doing in this guide), it won't ready a Ready state until we deploy cilium.
 
 ## Configure kubectl
 
@@ -486,14 +462,13 @@ helm upgrade cilium cilium/cilium --version 1.20.2 \
 
 ## Configuring Longhorn on worker nodes
 
-I'm using V1 Data Engine.
-June 2 2026 update: The V2 Data Engine went GA with Longhorn 1.12 but I'm opting to wait longer before using it
+I'm using the LongHorn V2 Data Engine that went GA with v1.12 on June 2 2026.
 
 ```shell
 cd infrastructure/talos
 
 # Create and mount volume /var/mnt/longhorn using an available disk (our VM should have 2 disks, with 1 available)
-talosctl patch mc --patch @controlplane-patch2-longhorn-volume.yaml --nodes 10.1.0.21,10.1.0.22,10.1.0.23
+talosctl patch mc --patch @patch-controlplane-longhorn-volume.yaml --nodes 10.1.0.21,10.1.0.22,10.1.0.23
 
 # Check if a "u-longhorn" (u for user volume) was mounted in each node
 talosctl get volumestatus | grep longhorn
@@ -511,7 +486,7 @@ kubectl apply -f k8s/longhorn/namespace_longhorn-system.yaml
 
 helm repo add longhorn https://charts.longhorn.io && helm repo update
 
-helm install longhorn longhorn/longhorn --version 1.12.0 --namespace longhorn-system --values=k8s/longhorn/helm_values.yaml 
+helm install longhorn longhorn/longhorn --version 1.13.0 --namespace longhorn-system --values=k8s/longhorn/helm_values.yaml 
 
 # Wait for all pods to reach a running state
 kubectl -n longhorn-system rollout status deploy/longhorn-driver-deployer
@@ -555,9 +530,34 @@ kubectl delete pvc longhorn-test-pvc
 
 ## Configuring Metric Server
 
-It should have been automatically deployed during the bootstrap based on the defined machine configurations. Use the following to test:
+Create the following patch file `patch-all-cert-rotation-enable.yaml`:
+
+```yaml
+apiVersion: v1alpha1
+kind: KubeletConfig
+extraArgs:
+  rotate-server-certificates: true
+```
+
+apply the patch on all nodes:
 
 ```shell
+talosctl patch mc --patch patch-all-cert-rotation-enable.yaml
+```
+
+Install the metric server
+
+```shell
+kubectl apply -f https://raw.githubusercontent.com/alex1989hu/kubelet-serving-cert-approver/main/deploy/standalone-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+```
+
+Testing if it's working:
+
+```shell
+
+kubectl get deployment metrics-server -n kube-system
+
 kubectl top nodes
 # It should output something like the below:
 #NAME     CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%   
@@ -572,9 +572,30 @@ kubectl top nodes
 curl 10.1.0.11:2381/metrics
 ```
 
-In case the case the metric server wasn't auto deployed during the bootstrap, use the following:
+## ArgoCD
 
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/alex1989hu/kubelet-serving-cert-approver/main/deploy/standalone-install.yaml
-kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+kubectl create namespace argocd
+kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+# Check if different pods are running
+kubectl get pods -n argocd
+
+# Use this to get the latest events in the argocd namespace to troubleshoot if necessary
+kubectl -n argocd get events --sort-by=.lastTimestamp | tail
+
+# Get the initial admin password
+# This secret will only be created if argocd has been able to successfully deploy
+kubectl get secret argocd-initial-admin-secret -n argocd -o json | jq .data.password  -r | base64 -d
+
+# Give ArgoCD an external IP
+kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
+# Or just do port forwarding with: kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# use this to obtain the external IP
+kubectl get service argocd-server -n argocd -o=jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
+
+Using the browser, connect to `https://<ip>`
+Login using `admin` and the initial password.

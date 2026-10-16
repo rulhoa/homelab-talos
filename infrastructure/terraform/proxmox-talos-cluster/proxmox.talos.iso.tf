@@ -10,6 +10,6 @@ resource "proxmox_download_file" "talos_iso" {
   #  cloud server: nocloud
   #  system extensions: qemu-guest-agent
   #  bootloader: auto
-  url                = "https://factory.talos.dev/image/ce4c980550dd2ab1b17bbf2b08801c7eb59418eafe8f279833297925d67c7515/v1.13.5/nocloud-amd64.iso"
-  file_name          = "talos-1.13.5.iso"
+  url                = "https://factory.talos.dev/image/88d1f7a5c4f1d3aba7df787c448c1d3d008ed29cfb34af53fa0df4336a56040b/v1.14.2/nocloud-amd64.iso"
+  file_name          = "talos-1.14.2.iso"
 }

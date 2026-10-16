@@ -19,8 +19,9 @@
   #upgradeVersionCheck: false
 
 defaultSettings:
+  v2DataEngine: true
   # Default number of replicas when creating volumes in the longhorn UI
-  defaultReplicaCount: 3
+  defaultReplicaCount: 2
   # -- Percentage of storage that can be allocated relative to hard drive capacity. The default value is "100".
   storageOverProvisioningPercentage: 500
   # -- Percentage of minimum available disk capacity. When the minimum available capacity exceeds the total available capacity, the disk becomes unschedulable until more space is made available for use. The default value is "25".
@@ -35,6 +36,6 @@ defaultSettings:
 
 persistence:
   # -- Replica count of the default Longhorn StorageClass.
-  defaultClassReplicaCount: 3
+  defaultClassReplicaCount: 2
   # -- Reclaim policy that provides instructions for handling of a volume after its claim is released. (Options: "Retain", "Delete")
   reclaimPolicy: Delete
