@@ -1,0 +1,201 @@
+kind: "DatadogAgent"
+apiVersion: "datadoghq.com/v2alpha1"
+metadata:
+  name: "datadog"
+  namespace: "datadog"
+  annotations:
+    # See: https://docs.datadoghq.com/containers/datadog_operator/providers/#supported-providers
+    agent.datadoghq.com/cluster-provider: talos
+    # Without this, the datadog auto instrumentation can prevent application pods from starting due to 
+    # errors such as: violates PodSecurity "baseline:latest": hostPath volumes (volume "datadog")
+
+    # App & API Protection: monitoring of threats
+    agent.datadoghq.com/appsec.injector.enabled: "true"
+
+    # Enable Agent to take remediation actions.
+    # Talos: The following default datadog settings cause agent pods to fail to start
+    #agent.datadoghq.com/private-action-runner-enabled: "true"
+    #agent.datadoghq.com/private-action-runner-configdata: |
+    #  private_action_runner:
+    #    enabled: true
+    #    self_enroll: true
+    #    api_key_only_enrollment: true
+    #    actions_allowlist:
+    #      - com.datadoghq.script.runPredefinedScript
+    #cluster-agent.datadoghq.com/private-action-runner-enabled: "true"
+    #cluster-agent.datadoghq.com/private-action-runner-configdata: |
+    #  private_action_runner:
+    #    enabled: true
+    #    self_enroll: true
+    #    api_key_only_enrollment: true
+    #    actions_allowlist:
+    #      - com.datadoghq.script.runPredefinedScript
+
+spec:
+  override:
+    clusterAgent:
+      image:
+        name: "registry.datadoghq.com/cluster-agent:latest"
+      containers:
+        cluster-agent:
+          resources:
+              requests: { cpu: 200m, memory: 256Mi }
+              limits:   { cpu: "1", memory: 512Mi }
+    nodeAgent:
+      image:
+        name: "registry.datadoghq.com/agent:latest"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      # Required for NPM to work on Talos:
+      volumes:
+        - name: tracefs
+          hostPath:
+            path: /sys/kernel/tracing
+      containers:
+        agent:
+          resources:
+            # Agent's Go runtime sizes its scheduler to the host CPU count by default.
+            # This scales memory usage proportionally with the CPU count and can cause the Agent container to be OOM-killed even with otherwise modest workloads.
+            # Recommended to set a value that is reasonable to node size.
+            # Note that datadog agent profiles can be enabled to allow personalized settings.
+            requests: { cpu: 200m, memory: 512Mi }
+            # Use an integer value for limits.cpu so the runtime can read it directly.
+            limits:   { cpu: "1", memory: 1Gi }
+        trace-agent:
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 300m, memory: 512Mi }
+        process-agent:
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits:   { cpu: 200m, memory: 256Mi }
+        system-probe:
+          volumeMounts:
+            - name: tracefs
+              mountPath: /sys/kernel/tracing
+          resources:
+            requests: { cpu: 50m, memory: 512Mi }
+            limits:   { cpu: 200m, memory: 1Gi }
+
+
+  global:
+    kubelet:
+      # Talos uses self signed certs
+      tlsVerify: false
+    clusterName: "talos"
+    site: "datadoghq.com"
+    credentials:
+      apiSecret:
+        secretName: "datadog-secret"
+        keyName: "api-key"
+    tags:
+      - "env:homelab"
+  features:
+
+    admissionController:
+      # injects configurations for APM connectivity into containers
+      enabled: true      
+      agentCommunicationMode: service # hostip | socket | service
+      #  service: has Admission Controller add the DD_AGENT_HOST environment variable for the DNS name of the service.
+      
+      failurePolicy: Ignore # Ignore | Fail
+
+    # K8s resource mapping
+    clusterChecks:
+      enabled: true
+    orchestratorExplorer:
+      enabled: true
+    
+    # APM features
+    apm:
+      instrumentation:
+        enabled: true
+        targets:
+          - name: "default-target"
+            ddTraceVersions:
+              java: "1"
+              python: "4"
+              js: "6"
+              php: "1"
+              dotnet: "3"
+              ruby: "2"
+            ddTraceConfigs:
+              # Continuous profiling
+              - name: "DD_PROFILING_ENABLED"
+                value: "auto"
+              # Data streams: end-to-end latency and visualize streaming pipelines
+              - name: "DD_DATA_STREAMS_ENABLED"
+                value: "true"
+    
+    # Log collection
+    logCollection:
+      enabled: true
+      containerCollectAll: true
+    
+    # Security featues
+    asm:
+      # App & API Protection: monitoring of threats
+      threats:
+        enabled: true
+      # Software Composition Analysis: vuln, license issues, supply chain risks in opensource libs
+      sca:
+        enabled: true
+      # Runtime Code Analysis: find and fix vuln in code in real time
+      iast:
+        enabled: true
+    
+    # Cloud Security: scans for vulnerabilities and missconfigs
+    sbom:
+      enabled: true
+      containerImage:
+        enabled: true
+      host:
+        enabled: true
+    
+    # Universal Service Monitoring: discover, map, and monitor every service without code changes
+    # Uses + ~100mb memory per agent pod
+    usm:
+      enabled: true
+    
+    # Cloud Network Monitoring (Cilium/ebpf)
+    npm:
+      enabled: true
+    
+    # K8S autoscaling of workloads
+    autoscaling:
+      workload:
+        enabled: true
+    eventCollection:
+      unbundleEvents: true
+
+    ###
+    # None of the features below are supported on Talos as they require running mkdir on "/etc/passwd" but talos is immutable (readonly
+    ###
+
+    liveProcessCollection:
+      enabled: false
+    liveContainerCollection:
+      enabled: false
+    processDiscovery:
+      enabled: false
+    
+    # Workload protection: in-kernel analysis of host and container workloads
+    cws:
+      enabled: false
+    
+    # Cloud Security: scans for vulnerabilities and missconfigs
+    cspm:
+      enabled: false
+
+    # Being tested
+    #
+    # First enabled: 2026-10-13
+    # metric had not been created yet
+    #
+    #
+    # https://docs.datadoghq.com/integrations/oom-kill/
+    # Uses ebpf to collect the number of processes killed by OOM into the metric oom_kill.oom_process.count
+    oomKill:
+      enabled: true
