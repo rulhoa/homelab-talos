@@ -462,8 +462,6 @@ helm upgrade cilium cilium/cilium --version 1.20.2 \
 
 ## Configuring Longhorn on worker nodes
 
-I'm using the LongHorn V2 Data Engine that went GA with v1.12 on June 2 2026.
-
 ```shell
 cd infrastructure/talos
 
