@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: datadog-private-location-worker
+    namespace: datadog-private-location
+spec:
+    selector:
+        matchLabels:
+            app: private-location
+    template:
+        metadata:
+            name: datadog-private-location-worker
+            labels:
+                app: private-location
+        spec:
+            containers:
+                - name: datadog-private-location-worker
+                  image: gcr.io/datadoghq/synthetics-private-location-worker:latest
+                  resources:
+                      requests: { cpu: 50m, memory: 256Mi }
+                      limits: { cpu: 100m, memory: 512Mi }
+                  volumeMounts:
+                      - mountPath: /etc/datadog/synthetics-check-runner.json
+                        name: worker-config
+                        # Update to the actual file name
+                        subPath: worker-config-datadog-private-location-talos-ef8c2830a95c9b1f1cad3179f8e6dd5b.json
+            volumes:
+                - name: worker-config
+                  secret:
+                      secretName: private-location-worker-config
