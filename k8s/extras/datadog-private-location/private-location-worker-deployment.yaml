@@ -17,8 +17,8 @@ spec:
                 - name: datadog-private-location-worker
                   image: gcr.io/datadoghq/synthetics-private-location-worker:latest
                   resources:
-                      requests: { cpu: 50m, memory: 256Mi }
-                      limits: { cpu: 200m, memory: 512Mi }
+                      requests: { cpu: 50m, memory: 512Mi }
+                      limits: { cpu: 200m, memory: 1Gi }
                   volumeMounts:
                       - mountPath: /etc/datadog/synthetics-check-runner.json
                         name: worker-config
