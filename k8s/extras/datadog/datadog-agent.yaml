@@ -41,6 +41,41 @@ spec:
           resources:
               requests: { cpu: 200m, memory: 256Mi }
               limits:   { cpu: "1", memory: 512Mi }
+      
+      #Examples
+      tolerations:      
+      # 1. Tolerate a taint regardless of its value
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+
+        # 2. Tolerate a taint only for a specific value
+        - key: dedicated
+          operator: Equal
+          value: monitoring
+          effect: NoSchedule
+
+        # 3. Tolerate every taint with a given effect,
+        #    regardless of key or value
+        - operator: Exists
+          effect: NoSchedule
+
+        # 4. Tolerate every taint on the cluster
+        #    (broad; use carefully)
+        - operator: Exists
+
+        # 5. Tolerate a taint that evicts existing pods
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+          tolerationSeconds: 300
+
+        # 6. Tolerate a preferred-only taint
+        - key: workload
+          operator: Equal
+          value: batch
+          effect: PreferNoSchedule          
+
     nodeAgent:
       image:
         name: "registry.datadoghq.com/agent:latest"
