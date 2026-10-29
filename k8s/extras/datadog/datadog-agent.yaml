@@ -42,39 +42,46 @@ spec:
               requests: { cpu: 200m, memory: 256Mi }
               limits:   { cpu: "1", memory: 512Mi }
       
-      #Examples
-      tolerations:      
-      # 1. Tolerate a taint regardless of its value
+      tolerations: # List of taints to ignore when deciding where to deploy the clusterAgent
+      # Default taint on talos control-planes
+      # Tolerate a taint regardless of its value
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
 
-        # 2. Tolerate a taint only for a specific value
+        # Tolerate every taint on the cluster
+        #    (broad; use carefully)
+        - operator: Exists
+
+      # The following are examples
+        # Tolerate a taint only for a specific value
         - key: dedicated
           operator: Equal
           value: monitoring
           effect: NoSchedule
 
-        # 3. Tolerate every taint with a given effect,
+        # Tolerate every taint with a given effect,
         #    regardless of key or value
         - operator: Exists
           effect: NoSchedule
 
-        # 4. Tolerate every taint on the cluster
-        #    (broad; use carefully)
-        - operator: Exists
-
-        # 5. Tolerate a taint that evicts existing pods
+        # Tolerate a taint that evicts existing pods
         - key: node.kubernetes.io/unreachable
           operator: Exists
           effect: NoExecute
-          tolerationSeconds: 300
+          tolerationSeconds: 300 #  This instruction is important for NoExecute (common during node maintenance) so that the datadog CRD knows that it needs to evict.
 
-        # 6. Tolerate a preferred-only taint
+        # Tolerate a preferred-only taint
         - key: workload
           operator: Equal
           value: batch
-          effect: PreferNoSchedule          
+          effect: PreferNoSchedule
+
+      env:
+        # Maximum time in seconds the admission controller waits for a webhook response.
+        # When a large number of pods restart, the response time can go above the default timeout of 10seconds.
+        - name: DD_ADMISSION_CONTROLLER_TIMEOUT_SECONDS
+          value: "30"
 
     nodeAgent:
       image:
